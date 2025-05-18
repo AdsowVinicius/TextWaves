@@ -1,0 +1,68 @@
+# Ignorar node_modules
+node_modules/
+
+# Ignorar arquivos de log
+*.log
+
+# Ignorar ambientes virtuais de Python
+venv/
+env/
+backend/env/
+
+# Ignorar arquivos compilados
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar arquivos de configuração do IDE
+.idea/
+.vscode/
+
+# Ignorar todos os arquivos dentro de uma pasta "build"
+build/
+
+# Ignorar arquivos específicos dentro de uma pasta
+temp/*.log
+
+# Ignorar arquivos de log
+*.log
+
+# Ignorar diretórios temporários
+temp/
+.str
+# Ignorar arquivos binários
+*.exe
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.mp4
+.wav
+
+ffmpeg/
+uploads/
+
+videosSubtitles/
+
+.venv/

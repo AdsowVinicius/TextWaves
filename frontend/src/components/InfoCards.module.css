@@ -1,0 +1,43 @@
+.InfoCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 1200px;
+  padding-top: 217px;
+  justify-items: center;
+  margin: 0 auto;
+  gap: 40px;
+}
+
+.InfoCards img {
+  width: 560px;
+  max-width: 100%;
+}
+
+.InfoCards .imageIcon {
+  width: 30px;
+  justify-self: left;
+}
+
+.texto {
+  place-content: center;
+}
+
+.texto h3 {
+  font-family: "Krona One", sans-serif;
+  font-weight: 400;
+  font-size: 24px;
+  margin-top: 24px;
+}
+
+.texto h5 {
+  font-family: "Krona One", sans-serif;
+  font-weight: 400;
+  font-size: 20px;
+  margin-top: 42px;
+}
+
+.texto p {
+  font-family: "Roboto", sans-serif;
+  font-size: 18px;
+  margin-top: 24px;
+}

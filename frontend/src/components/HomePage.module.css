@@ -1,0 +1,76 @@
+.background {
+  background-image: linear-gradient(#000633, #043e3b);
+  width: 100%;
+  color: #f2f4ff;
+  padding-bottom: 200px;
+}
+.conteudo {
+  max-width: 1200px;
+  padding-top: 217px;
+  display: grid;
+  justify-items: center;
+  margin: 0 auto;
+}
+
+.inicio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.inicio img {
+  width: 100%;
+  max-width: 700px;
+}
+
+.conteudo h1 {
+  font-family: "Krona One", sans-serif;
+  font-size: 44px;
+  max-width: 760px;
+  letter-spacing: 4.5px;
+  align-self: center;
+  font-weight: 400;
+}
+
+.testar {
+  margin-top: 220px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  font-family: "Krona One", sans-serif;
+  font-weight: 300;
+}
+
+.testartexto {
+  align-items: end;
+  text-align: end;
+  align-content: center;
+  justify-self: end;
+}
+
+.testartexto {
+  max-width: 400px;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.testartexto a {
+  text-decoration: none;
+  color: #fff;
+  background-color: #0dafa5;
+  padding: 8px 16px;
+  border-radius: 4px;
+}
+
+.conteudo h2 {
+  font-family: "Krona One", sans-serif;
+  font-weight: 400;
+  font-size: 36px;
+  max-width: 840px;
+  padding: 40px 60px;
+  border-color: #0dafa5;
+  border-style: dashed;
+  border-width: 2px;
+  margin-top: 240px;
+}

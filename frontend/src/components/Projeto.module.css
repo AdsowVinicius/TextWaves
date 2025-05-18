@@ -1,0 +1,17 @@
+.background {
+  background-image: linear-gradient(#000633, #043e3b);
+  width: 100%;
+  color: #f2f4ff;
+  padding: 100px;
+}
+
+.conteudoProjeto {
+  max-width: 1200px;
+  margin: 0 auto;
+  justify-items: center;
+}
+
+.conteudoProjeto h1 {
+  font-family: Krona One, Sans-serif;
+  margin-bottom: 40px;
+}
