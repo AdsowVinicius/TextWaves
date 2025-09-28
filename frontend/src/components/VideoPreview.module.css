@@ -1,0 +1,325 @@
+/* VideoPreview.module.css */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Roboto', sans-serif;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.header h1 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.uploadSection {
+  margin: 20px 0;
+}
+
+.uploadBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.uploadBtn:hover {
+  transform: translateY(-2px);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mainContent {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-top: 20px;
+}
+
+@media (max-width: 1200px) {
+  .mainContent {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Seção do Vídeo */
+.videoSection {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.videoContainer {
+  position: relative;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.videoPlayer {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.subtitleOverlay {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  text-align: center;
+  max-width: 80%;
+  line-height: 1.4;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Painel de Configuração */
+.configPanel {
+  margin-top: 20px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.configPanel h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.configGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 15px;
+}
+
+.configGrid label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.configGrid input[type="range"] {
+  flex: 1;
+}
+
+.configGrid input[type="color"] {
+  width: 50px;
+  height: 35px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.configGrid select {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+}
+
+/* Seção do Editor */
+.editorSection {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.timelineInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.activeSubtitle {
+  color: #667eea;
+  font-weight: bold;
+}
+
+.subtitlesList h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.subtitlesContainer {
+  max-height: 500px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+}
+
+.subtitleItem {
+  padding: 15px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.subtitleItem:hover {
+  background-color: #f8f9ff;
+}
+
+.subtitleItem.active {
+  background-color: #e8f0fe;
+  border-left: 4px solid #667eea;
+}
+
+.subtitleItem:last-child {
+  border-bottom: none;
+}
+
+.subtitleHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.subtitleNumber {
+  font-weight: bold;
+  color: #666;
+}
+
+.seekBtn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.seekBtn:hover {
+  background: #5a67d8;
+}
+
+.timingInputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.timingInputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.timeInput {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.textEditor {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.textEditor:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+/* Botões de Ação */
+.actionButtons {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.saveBtn, .renderBtn, .newVideoBtn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.saveBtn {
+  background: #28a745;
+  color: white;
+}
+
+.saveBtn:hover {
+  background: #218838;
+}
+
+.renderBtn {
+  background: #fd7e14;
+  color: white;
+}
+
+.renderBtn:hover {
+  background: #e8690b;
+}
+
+.newVideoBtn {
+  background: #6c757d;
+  color: white;
+}
+
+.newVideoBtn:hover {
+  background: #5a6268;
+}
+
+.saveBtn:disabled, .renderBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Scrollbar personalizada */
+.subtitlesContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.subtitlesContainer::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.subtitlesContainer::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.subtitlesContainer::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
