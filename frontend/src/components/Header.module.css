@@ -56,3 +56,40 @@ header {
   text-decoration: none;
   color: #f2f4ff;
 }
+
+/* Estilos para menu de usuário logado */
+.userMenu {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.userLink {
+  color: #f2f4ff;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.3s ease;
+  font-size: 16px;
+}
+
+.userLink:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.logoutBtn {
+  background: rgba(220, 38, 38, 0.8);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.3s ease;
+}
+
+.logoutBtn:hover {
+  background: rgba(220, 38, 38, 1);
+}
