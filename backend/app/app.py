@@ -1,11 +1,39 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
+from flask_jwt_extended import JWTManager
 from utils.generateStrFileVideo import generate_str_file_and_video
 import os
 import uuid
 from flask_cors import CORS
+from datetime import timedelta
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Configurações JWT
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'textwaves-secret-key-change-in-production')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
+
+# Inicializar JWT
+jwt = JWTManager(app)
+
+# Configuração do banco de dados
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///textwaves.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Inicializar banco de dados
+from database.db_config import init_database
+init_database(app)
+
+# Registrar blueprints
+from routes.auth_routes import auth_bp
+from routes.user_management_routes import users_bp
+from routes.preview_routes import preview_bp
+
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(users_bp, url_prefix='/api')
+app.register_blueprint(preview_bp)
+
 # Diretório para armazenar os vídeos enviados
 UPLOAD_FOLDER = 'uploads'
 try:
@@ -16,8 +44,8 @@ except Exception as e:
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Diretório do backend
-BACKEND_DIRECTORY = "C:\\Users\\Dell\\Desktop\\TextWaves-main\\backend"
+# Diretório do backend (ajustado para o seu caminho)
+BACKEND_DIRECTORY = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 print(f"BACKEND_DIRECTORY configurado em: {BACKEND_DIRECTORY}")
 
 @app.route('/open-api', methods=['GET'])
