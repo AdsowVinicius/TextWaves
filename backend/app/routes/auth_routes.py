@@ -3,9 +3,9 @@ from flask_jwt_extended import (
     create_access_token, create_refresh_token,
     jwt_required, get_jwt_identity, get_jwt
 )
-from werkzeug.security import check_password_hash
 from datetime import datetime, timedelta
 import re
+from sqlalchemy import func
 
 # Importe o modelo de usuário
 from models.user_model import User, TokenBlacklist, db
@@ -35,8 +35,9 @@ def register():
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({'error': f'Campo {field} é obrigatório'}), 400
-        
+
         username = data['username'].strip()
+        username_lower = username.lower()
         email = data['email'].strip().lower()
         password = data['password']
         role = data.get('role', 'user')  # Default: user
@@ -50,10 +51,10 @@ def register():
             return jsonify({'error': msg}), 400
         
         # Verificar se usuário já existe
-        if User.query.filter_by(username=username).first():
+        if User.query.filter(func.lower(User.username) == username_lower).first():
             return jsonify({'error': 'Nome de usuário já existe'}), 409
             
-        if User.query.filter_by(email=email).first():
+        if User.query.filter(func.lower(User.email) == email).first():
             return jsonify({'error': 'Email já cadastrado'}), 409
         
         # Verificar se é o primeiro usuário (será admin)
@@ -90,13 +91,15 @@ def login():
         
         if not data or not data.get('login') or not data.get('password'):
             return jsonify({'error': 'Login e senha são obrigatórios'}), 400
-        
-        login = data['login'].strip().lower()
+
+        login_input = data['login'].strip()
+        login_normalized = login_input.lower()
         password = data['password']
         
         # Buscar usuário por email ou username
         user = User.query.filter(
-            (User.email == login) | (User.username == login)
+            (func.lower(User.email) == login_normalized) |
+            (func.lower(User.username) == login_normalized)
         ).first()
         
         if not user or not user.check_password(password):

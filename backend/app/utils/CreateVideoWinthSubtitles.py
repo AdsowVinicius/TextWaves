@@ -1,5 +1,16 @@
-import moviepy.editor as mp
+import logging
 import os
+from dataclasses import dataclass
+from typing import Iterable, Sequence, Tuple
+
+import numpy as np
+import moviepy.editor as mp
+import moviepy.audio.fx.all as afx
+from moviepy.audio.AudioClip import AudioClip, CompositeAudioClip
+from moviepy.video.tools.subtitles import SubtitlesClip
+
+
+logger = logging.getLogger(__name__)
 
 # Configurar o caminho para o ffmpeg baseado na estrutura do projeto
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -9,16 +20,26 @@ ffmpeg_path = os.path.join(backend_dir, "app", "ffmpeg", "bin", "ffmpeg.exe")
 # Verificar se o ffmpeg existe no projeto
 if os.path.exists(ffmpeg_path):
     os.environ["FFMPEG_BINARY"] = ffmpeg_path
-    print(f"FFmpeg configurado em: {ffmpeg_path}")
+    logger.info("FFmpeg configurado em: %s", ffmpeg_path)
 else:
-    print(f"FFmpeg não encontrado em: {ffmpeg_path}")
-    # Fallback para o caminho padrão se existir
+    logger.warning("FFmpeg não encontrado em: %s", ffmpeg_path)
     fallback_path = r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"
     if os.path.exists(fallback_path):
         os.environ["FFMPEG_BINARY"] = fallback_path
-        print(f"Usando FFmpeg do sistema: {fallback_path}")
+        logger.info("Usando FFmpeg do sistema: %s", fallback_path)
     else:
-        print("FFmpeg não encontrado. Pode ser necessário instalar o FFmpeg.")
+        logger.error("FFmpeg não encontrado. Pode ser necessário instalar o FFmpeg.")
+
+
+@dataclass
+class SubtitleRenderingOptions:
+    font_path: str
+    font_color: str = "white"
+    bg_color: str = "rgba(0,0,0,0.8)"
+    align: str = "center"
+    method: str = "caption"
+    stroke_color: str | None = None
+    stroke_width: int = 0
 
 def calculate_subtitle_parameters(video_width, video_height):
     """Calcula parâmetros dinâmicos para as legendas baseados nas proporções do vídeo."""
@@ -72,54 +93,90 @@ def calculate_subtitle_parameters(video_width, video_height):
         'aspect_ratio': aspect_ratio
     }
 
-def create_video_with_subtitles(video_path, subtitles, output_video_path, font_path):
-    """Cria um novo vídeo com legendas sobrepostas com tamanho ajustado às proporções do vídeo."""
-    print("######################-iniciando-######################")
-    video_clip = mp.VideoFileClip(video_path)
-    
-    # Obtendo as dimensões do vídeo
-    video_width = video_clip.size[0]
-    video_height = video_clip.size[1]
-    
-    # Calculando parâmetros dinâmicos baseados nas proporções do vídeo
-    params = calculate_subtitle_parameters(video_width, video_height)
-    
-    print(f"Dimensões do vídeo: {video_width}x{video_height}")
-    print(f"Proporção do vídeo: {params['aspect_ratio']:.2f}")
-    print(f"Altura da legenda: {params['subtitle_height']}px")
-    print(f"Tamanho da fonte: {params['font_size']}px")
-    print(f"Largura da legenda: {params['subtitle_width']}px")
+def create_video_with_subtitles(
+    video_path: str,
+    subtitles: Sequence[Tuple[float, float, str]],
+    output_video_path: str,
+    subtitle_options: SubtitleRenderingOptions,
+    beep_intervals: Iterable[Tuple[float, float]] | None = None,
+    beep_frequency: int = 1000,
+    beep_volume: float = 0.4,
+    ducking_volume: float | None = 0.35,
+    codec: str = "libx264",
+    fps: int = 24,
+):
+    """Renderiza um vídeo com legendas e opcionalmente insere beeps em trechos proibidos."""
 
-    # Criando um clipe de fundo para as legendas com parâmetros dinâmicos
-    def make_subtitle_clip(text, start, duration, font_path):
-        return (mp.TextClip(text, 
-                           font=font_path, 
-                           fontsize=params['font_size'], 
-                           color='white', 
-                           bg_color='rgba(0,0,0,0.8)',  # Fundo semi-transparente
-                           size=(params['subtitle_width'], params['subtitle_height']),
-                           method='caption',  # Permite quebra de linha automática
-                           align='center')
-                .set_position(('center', video_height - params['subtitle_height'] - params['bottom_margin']))
-                .set_start(start)
-                .set_duration(duration))
-    
-    print("######################- iniciando integração de legendas -################")
-    
-    # Lista para armazenar todos os clipes de legenda
-    subtitle_clips = []
-    
-    for start, end, text in subtitles:
-        txt_clip = make_subtitle_clip(text, start, end - start, font_path)
-        subtitle_clips.append(txt_clip)
-    
-    # Compondo o vídeo final com todas as legendas de uma vez (mais eficiente)
-    if subtitle_clips:
-        final_video = mp.CompositeVideoClip([video_clip] + subtitle_clips)
+    logger.info("Iniciando processamento de legendas para %s", video_path)
+    video_clip = mp.VideoFileClip(video_path)
+    video_width, video_height = video_clip.size
+
+    params = calculate_subtitle_parameters(video_width, video_height)
+    logger.debug(
+        "Video size=%sx%s | aspect=%.2f | subtitle_size=(w=%s, h=%s) | font=%s",
+        video_width,
+        video_height,
+        params['aspect_ratio'],
+        params['subtitle_width'],
+        params['subtitle_height'],
+        params['font_size'],
+    )
+
+    def _make_textclip(txt: str) -> mp.TextClip:
+        textclip_kwargs = {
+            "font": subtitle_options.font_path,
+            "fontsize": params['font_size'],
+            "color": subtitle_options.font_color,
+            "bg_color": subtitle_options.bg_color,
+            "method": subtitle_options.method,
+            "align": subtitle_options.align,
+            "size": (params['subtitle_width'], params['subtitle_height']),
+        }
+        if subtitle_options.stroke_color and subtitle_options.stroke_width > 0:
+            textclip_kwargs["stroke_color"] = subtitle_options.stroke_color
+            textclip_kwargs["stroke_width"] = subtitle_options.stroke_width
+
+        return mp.TextClip(**textclip_kwargs)
+
+    subtitle_clip = SubtitlesClip(subtitles, _make_textclip)
+    subtitle_clip = subtitle_clip.set_position(
+        ("center", video_height - params['subtitle_height'] - params['bottom_margin'])
+    )
+
+    final_video = mp.CompositeVideoClip([video_clip, subtitle_clip])
+
+    audio_clip = video_clip.audio
+    beep_items: list[Tuple[float, float]] = list(beep_intervals or [])
+
+    if audio_clip and beep_items:
+        base_audio = audio_clip
+        if ducking_volume is not None:
+            base_audio = audio_clip.fx(afx.volumex, max(0.0, min(1.0, ducking_volume)))
+
+        def make_beep(duration: float) -> AudioClip:
+            def _tone(t):
+                return beep_volume * np.sin(2 * np.pi * beep_frequency * t)
+
+            return AudioClip(_tone, duration=duration, fps=44100)
+
+        beep_clips = []
+        for start, end in beep_items:
+            duration = max(0.05, float(end) - float(start))
+            beep_clip = make_beep(duration).set_start(float(start))
+            beep_clips.append(beep_clip)
+
+        composite_parts: list[AudioClip] = [base_audio]
+        composite_parts.extend(beep_clips)
+        composite_audio: AudioClip = CompositeAudioClip(composite_parts)
     else:
-        final_video = video_clip
-    
-    final_video.write_videofile(output_video_path, codec='libx264', fps=24)
+        composite_audio = audio_clip
+
+    if composite_audio:
+        composite_audio = composite_audio.set_duration(final_video.duration)
+        final_video = final_video.set_audio(composite_audio)
+
+    logger.info("Exportando vídeo legendado para %s", output_video_path)
+    final_video.write_videofile(output_video_path, codec=codec, fps=fps)
     return final_video
 
 

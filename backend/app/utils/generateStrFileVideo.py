@@ -1,6 +1,10 @@
 import os
 from .audioExtract import extract_audio_from_video
-from .CreateVideoWinthSubtitles import create_video_with_subtitles
+from .CreateVideoWinthSubtitles import (
+    SubtitleRenderingOptions,
+    create_video_with_subtitles,
+)
+from .profanity_filter import censor_segments
 from .detectPauses import detect_pauses
 from .transcribeAudio import transcribe_audio
 import os
@@ -37,13 +41,8 @@ def generate_str_file_and_video(video_path, backend_directory, name_output):
     
     print("######################-transcreveu audio e segmentou-################")
     print(segments)
-    # Passo 4: Criar legendas com base nos segmentos transcritos
-    subtitles = []
-    for segment in segments:
-        start_time = segment['start']
-        end_time = segment['end']
-        text = segment['text']
-        subtitles.append((start_time, end_time, text))
+
+    subtitles, beep_intervals = censor_segments(segments)
 
     # Passo 5: Criar arquivo .str
     with open(str_file_path, 'w') as f:
@@ -56,7 +55,15 @@ def generate_str_file_and_video(video_path, backend_directory, name_output):
     
     print("######################- iniciando integração de legendas -################")
     font_path = "C:\\Windows\\Fonts\\arial.ttf"  # Caminho para a fonte Arial no Windows
-    create_video_with_subtitles(video_path, subtitles, output_video_path, font_path)
+    subtitle_options = SubtitleRenderingOptions(font_path=font_path)
+
+    create_video_with_subtitles(
+        video_path,
+        subtitles,
+        output_video_path,
+        subtitle_options,
+        beep_intervals=beep_intervals,
+    )
 
     print("######################--################")
 
