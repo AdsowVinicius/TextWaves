@@ -7,6 +7,7 @@ DEFAULT_FORBIDDEN_WORDS: Tuple[str, ...] = (
     "merda",
     "porra",
     "caralho",
+    "abelha",
 )
 
 
