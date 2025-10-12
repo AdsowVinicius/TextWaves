@@ -6,7 +6,10 @@ import hashlib
 
 from flask import Blueprint, jsonify, request
 
-from app.config import settings
+try:
+    from app.config import settings
+except ImportError:  # pragma: no cover - fallback for script execution
+    from config import settings
 from utils.audioExtract import extract_audio_from_video
 from utils.transcribeAudio import transcribe_audio
 from utils.profanity_filter import censor_segments

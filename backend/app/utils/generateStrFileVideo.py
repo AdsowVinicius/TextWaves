@@ -5,7 +5,10 @@ import logging
 from pathlib import Path
 from typing import Iterable
 
-from app.config import settings
+try:
+    from app.config import settings
+except ImportError:  # pragma: no cover - fallback for script execution
+    from config import settings
 from .audioExtract import extract_audio_from_video
 from .CreateVideoWinthSubtitles import SubtitleRenderingOptions, create_video_with_subtitles
 from .profanity_filter import censor_segments

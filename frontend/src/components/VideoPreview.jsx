@@ -43,6 +43,13 @@ const VideoPreview = () => {
     };
 
     fetchWords();
+
+    // Verificar se há video_hash na URL (vindo do upload)
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashFromURL = urlParams.get('video_hash');
+    if (hashFromURL) {
+      loadExistingSession(hashFromURL);
+    }
   }, []);
 
   useEffect(() => {
@@ -72,6 +79,39 @@ const VideoPreview = () => {
 
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Carregar sessão existente via hash
+  const loadExistingSession = async (hash) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/get_session/${hash}`);
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        setVideoHash(data.data.video_hash);
+        setSubtitles(data.data.subtitles);
+        setVideoFile({ name: data.data.video_info.filename });
+        
+        if (data.data.forbidden_words) {
+          setSelectedWords(data.data.forbidden_words);
+        }
+
+        // Carregar o vídeo original
+        const videoPath = data.data.video_path;
+        if (videoRef.current && videoPath) {
+          // Para vídeos já no servidor, precisamos de um endpoint que sirva o arquivo
+          videoRef.current.src = videoPath;
+        }
+      } else {
+        alert(`Erro ao carregar sessão: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar sessão:', error);
+      alert(`Erro: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Upload e processamento inicial
   const handleFileUpload = async (event) => {

@@ -1,7 +1,10 @@
 import re
 from typing import Iterable, Sequence, Tuple
 
-from app.config import settings, DEFAULT_PROFANITY_WORDS
+try:
+    from app.config import settings, DEFAULT_PROFANITY_WORDS
+except ImportError:  # pragma: no cover - fallback for script execution
+    from config import settings, DEFAULT_PROFANITY_WORDS
 
 DEFAULT_FORBIDDEN_WORDS: Tuple[str, ...] = DEFAULT_PROFANITY_WORDS
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import ForbiddenWordsSelector from "./ForbiddenWordsSelector";
 import styles from "./Projeto.module.css";
 
@@ -12,6 +13,8 @@ const Projeto = () => {
   const [selectedWords, setSelectedWords] = useState([]);
   const [isFetchingWords, setIsFetchingWords] = useState(false);
   const [wordsError, setWordsError] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadWords = async () => {
@@ -53,6 +56,9 @@ const Projeto = () => {
       return;
     }
 
+    setIsProcessing(true);
+    setResponseMessage("Processando vídeo...");
+
     const formData = new FormData();
     formData.append("video", videoFile);
     if (selectedWords.length > 0) {
@@ -60,22 +66,30 @@ const Projeto = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/process_video`, {
+      const response = await fetch(`${API_BASE}/process_video_preview`, {
         method: "POST",
         body: formData,
       });
 
       if (response.ok) {
-        const blob = await response.blob();
-        const videoURL = URL.createObjectURL(blob);
-        setDisplayVideoURL(videoURL);
-        setResponseMessage("Vídeo processado com sucesso!");
+        const data = await response.json();
+        if (data.status === 'success') {
+          setResponseMessage("Vídeo processado! Redirecionando para o editor...");
+          // Redirecionar para o editor com o hash do vídeo
+          setTimeout(() => {
+            navigate(`/Editor?video_hash=${data.video_hash}`);
+          }, 1000);
+        } else {
+          setResponseMessage(`Erro: ${data.message}`);
+        }
       } else {
         const errorData = await response.json();
         setResponseMessage(`Erro: ${errorData.message}`);
       }
     } catch (error) {
       setResponseMessage(`Erro de conexão: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -111,7 +125,9 @@ const Projeto = () => {
         )}
         <form onSubmit={handleSubmit} className={styles.form}>
           <input type="file" accept="video/*" onChange={handleFileChange} />
-          <button type="submit">Enviar</button>
+          <button type="submit" disabled={isProcessing || !videoFile}>
+            {isProcessing ? "Processando..." : "Enviar"}
+          </button>
         </form>
 
         {responseMessage && <p className={styles.response}>{responseMessage}</p>}

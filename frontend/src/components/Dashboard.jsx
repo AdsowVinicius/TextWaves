@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserManagement from './UserManagement';
 import './Dashboard.css';
 
 const Dashboard = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, apiCall } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (isAdmin() && activeTab === 'overview') {
@@ -18,7 +20,6 @@ const Dashboard = () => {
   const loadStats = async () => {
     setLoading(true);
     try {
-      const { apiCall } = useAuth();
       const response = await apiCall('http://localhost:5000/api/users/stats');
       
       if (response.ok) {
@@ -121,10 +122,16 @@ const Dashboard = () => {
               <p>Sistema avançado de legendagem automática de vídeos.</p>
               
               <div className="quick-actions">
-                <button className="btn btn-primary">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => navigate('/Projeto')}
+                >
                   📤 Novo Vídeo
                 </button>
-                <button className="btn btn-secondary">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setActiveTab('videos')}
+                >
                   📋 Ver Histórico
                 </button>
               </div>
@@ -137,7 +144,12 @@ const Dashboard = () => {
             <h2>🎬 Meus Vídeos</h2>
             <div className="empty-state">
               <p>Nenhum vídeo processado ainda.</p>
-              <button className="btn btn-primary">Processar Primeiro Vídeo</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => navigate('/Projeto')}
+              >
+                Processar Primeiro Vídeo
+              </button>
             </div>
           </div>
         )}

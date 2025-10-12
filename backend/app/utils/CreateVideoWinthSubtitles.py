@@ -10,7 +10,10 @@ import moviepy.audio.fx.all as afx
 from moviepy.audio.AudioClip import AudioClip, CompositeAudioClip
 from moviepy.video.tools.subtitles import SubtitlesClip
 
-from app.config import settings
+try:
+    from app.config import settings
+except ImportError:  # pragma: no cover - fallback for script execution
+    from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -126,9 +129,41 @@ def create_video_with_subtitles(
         params['font_size'],
     )
 
+    def _resolve_font_path(preferred_font: str | None) -> str | None:
+        candidates: list[str] = []
+        if preferred_font:
+            candidates.append(preferred_font)
+
+        settings_font = getattr(settings, "font_path", None)
+        if settings_font and settings_font not in candidates:
+            candidates.append(str(settings_font))
+
+        candidates.extend(
+            [
+                r"C:\\Windows\\Fonts\\arial.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            ]
+        )
+
+        for candidate in candidates:
+            try_path = Path(candidate)
+            if try_path.exists():
+                try:
+                    return try_path.resolve().as_posix()
+                except OSError:
+                    return try_path.as_posix()
+
+        logger.warning(
+            "Fonte não encontrada (%s). Texto será renderizado com fonte padrão do sistema.",
+            preferred_font or settings_font,
+        )
+        return None
+
+    resolved_font = _resolve_font_path(subtitle_options.font_path)
+
     def _make_textclip(txt: str) -> mp.TextClip:
         textclip_kwargs = {
-            "font": subtitle_options.font_path,
+            "txt": txt,
             "fontsize": params['font_size'],
             "color": subtitle_options.font_color,
             "bg_color": subtitle_options.bg_color,
@@ -136,13 +171,19 @@ def create_video_with_subtitles(
             "align": subtitle_options.align,
             "size": (params['subtitle_width'], params['subtitle_height']),
         }
+        if resolved_font:
+            textclip_kwargs["font"] = resolved_font
         if subtitle_options.stroke_color and subtitle_options.stroke_width > 0:
             textclip_kwargs["stroke_color"] = subtitle_options.stroke_color
             textclip_kwargs["stroke_width"] = subtitle_options.stroke_width
 
         return mp.TextClip(**textclip_kwargs)
 
-    subtitle_clip = SubtitlesClip(subtitles, _make_textclip)
+    formatted_subtitles = [
+        ((float(start), float(end)), str(text))
+        for start, end, text in subtitles
+    ]
+    subtitle_clip = SubtitlesClip(formatted_subtitles, _make_textclip)
     subtitle_clip = subtitle_clip.set_position(
         ("center", video_height - params['subtitle_height'] - params['bottom_margin'])
     )
@@ -157,9 +198,20 @@ def create_video_with_subtitles(
         if ducking_volume is not None:
             base_audio = audio_clip.fx(afx.volumex, max(0.0, min(1.0, ducking_volume)))
 
+        # Detectar número de canais do áudio original
+        test_frame = audio_clip.get_frame(0)
+        nchannels = 2 if test_frame.ndim == 1 or test_frame.shape[0] == 2 else 1
+
         def make_beep(duration: float) -> AudioClip:
             def _tone(t):
-                return beep_volume * np.sin(2 * np.pi * beep_frequency * t)
+                mono_signal = beep_volume * np.sin(2 * np.pi * beep_frequency * t)
+                if nchannels == 2:
+                    # Expandir para stereo duplicando o canal
+                    if np.isscalar(t):
+                        return np.array([mono_signal, mono_signal])
+                    else:
+                        return np.column_stack([mono_signal, mono_signal])
+                return mono_signal
 
             return AudioClip(_tone, duration=duration, fps=44100)
 
