@@ -47,6 +47,21 @@
   margin-top: 20px;
 }
 
+.wordsPanel {
+  margin-bottom: 24px;
+}
+
+.wordsPanel p {
+  margin: 0;
+  color: #444;
+}
+
+.wordsError {
+  margin-top: 8px;
+  color: #d64545;
+  font-weight: 500;
+}
+
 @media (max-width: 1200px) {
   .mainContent {
     grid-template-columns: 1fr;

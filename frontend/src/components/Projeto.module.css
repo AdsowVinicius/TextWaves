@@ -15,3 +15,50 @@
   font-family: Krona One, Sans-serif;
   margin-bottom: 40px;
 }
+
+.wordsSection {
+  margin-bottom: 32px;
+  display: grid;
+  gap: 12px;
+}
+
+.previewWrapper {
+  margin-bottom: 24px;
+  display: grid;
+  gap: 12px;
+}
+
+.form {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.form input[type="file"] {
+  cursor: pointer;
+}
+
+.form button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.form button:hover {
+  transform: translateY(-1px);
+}
+
+.response {
+  font-weight: 600;
+}
+
+.error {
+  color: #ffd4d4;
+  font-weight: 500;
+}

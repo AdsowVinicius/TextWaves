@@ -1,6 +1,7 @@
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable, Sequence, Tuple
 
 import numpy as np
@@ -9,26 +10,29 @@ import moviepy.audio.fx.all as afx
 from moviepy.audio.AudioClip import AudioClip, CompositeAudioClip
 from moviepy.video.tools.subtitles import SubtitlesClip
 
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Configurar o caminho para o ffmpeg baseado na estrutura do projeto
-current_dir = os.path.dirname(os.path.abspath(__file__))
-backend_dir = os.path.dirname(os.path.dirname(current_dir))
-ffmpeg_path = os.path.join(backend_dir, "app", "ffmpeg", "bin", "ffmpeg.exe")
+def _configure_ffmpeg_binary() -> None:
+    candidate_paths = []
+    if settings.ffmpeg_path:
+        candidate_paths.append(Path(settings.ffmpeg_path))
 
-# Verificar se o ffmpeg existe no projeto
-if os.path.exists(ffmpeg_path):
-    os.environ["FFMPEG_BINARY"] = ffmpeg_path
-    logger.info("FFmpeg configurado em: %s", ffmpeg_path)
-else:
-    logger.warning("FFmpeg não encontrado em: %s", ffmpeg_path)
-    fallback_path = r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"
-    if os.path.exists(fallback_path):
-        os.environ["FFMPEG_BINARY"] = fallback_path
-        logger.info("Usando FFmpeg do sistema: %s", fallback_path)
-    else:
-        logger.error("FFmpeg não encontrado. Pode ser necessário instalar o FFmpeg.")
+    packaged_path = Path(settings.base_dir) / "ffmpeg" / "bin" / "ffmpeg.exe"
+    candidate_paths.append(packaged_path)
+    candidate_paths.append(Path(r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"))
+
+    for path in candidate_paths:
+        if path and path.exists():
+            os.environ["FFMPEG_BINARY"] = str(path)
+            logger.info("FFmpeg configurado em: %s", path)
+            return
+
+    logger.warning("FFmpeg não encontrado nos caminhos esperados. MoviePy pode falhar ao exportar vídeos.")
+
+
+_configure_ffmpeg_binary()
 
 
 @dataclass

@@ -1,13 +1,41 @@
-from flask import Blueprint, request, jsonify
-from werkzeug.utils import secure_filename
-import os
+from __future__ import annotations
+
 import json
-import uuid
-from utils.audioExtract import extract_audio_from_video
-from utils.transcribeAudio import transcribe_audio
+import os
 import hashlib
 
+from flask import Blueprint, jsonify, request
+
+from app.config import settings
+from utils.audioExtract import extract_audio_from_video
+from utils.transcribeAudio import transcribe_audio
+from utils.profanity_filter import censor_segments
+from utils.CreateVideoWinthSubtitles import (
+    SubtitleRenderingOptions,
+    create_video_with_subtitles,
+)
+
 preview_bp = Blueprint('preview', __name__)
+
+
+def _parse_forbidden_words(raw_value: str | None) -> list[str] | None:
+    if not raw_value:
+        return None
+
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        parsed = [item.strip() for item in raw_value.split(',') if item.strip()]
+    else:
+        if isinstance(parsed, (list, tuple)):
+            parsed = [str(item).strip() for item in parsed if str(item).strip()]
+        elif isinstance(parsed, str):
+            parsed = [parsed.strip()] if parsed.strip() else []
+        else:
+            parsed = []
+
+    return parsed if parsed else None
+
 
 @preview_bp.route('/process_video_preview', methods=['POST'])
 def process_video_preview():
@@ -20,10 +48,12 @@ def process_video_preview():
         if video_file.filename == '':
             return jsonify({'status': 'error', 'message': "Nenhum arquivo selecionado!"}), 400
 
+        forbidden_words = _parse_forbidden_words(request.form.get('forbidden_words'))
+
         # Salvar arquivo temporário
         upload_folder = 'uploads'
         os.makedirs(upload_folder, exist_ok=True)
-        
+
         video_path = os.path.join(upload_folder, video_file.filename)
         video_file.save(video_path)
 
@@ -39,15 +69,21 @@ def process_video_preview():
         transcribed_result = transcribe_audio(audio_path)
         segments = transcribed_result['segments']
 
+        sanitized_subtitles, beep_intervals = censor_segments(
+            segments,
+            forbidden_words=forbidden_words,
+        )
+
         # Criar estrutura de legendas
         subtitles = []
-        for i, segment in enumerate(segments):
+        for i, (start, end, text) in enumerate(sanitized_subtitles):
             subtitle = {
                 'id': i,
-                'start': segment['start'],
-                'end': segment['end'],
-                'text': segment['text'].strip(),
-                'confidence': segment.get('confidence', 0.5)
+                'start': start,
+                'end': end,
+                'text': text.strip(),
+                'raw_text': segments[i].get('text', '').strip(),
+                'confidence': segments[i].get('confidence', 0.5)
             }
             subtitles.append(subtitle)
 
@@ -59,7 +95,9 @@ def process_video_preview():
             'video_info': {
                 'filename': video_file.filename,
                 'duration': transcribed_result.get('duration', 0)
-            }
+            },
+            'forbidden_words': forbidden_words or list(settings.profanity_words),
+            'beep_intervals': beep_intervals,
         }
 
         session_file = os.path.join(upload_folder, f"session_{video_hash}.json")
@@ -74,7 +112,9 @@ def process_video_preview():
             'status': 'success',
             'video_hash': video_hash,
             'subtitles': subtitles,
-            'video_info': session_data['video_info']
+            'video_info': session_data['video_info'],
+            'forbidden_words': session_data['forbidden_words'],
+            'beep_intervals': beep_intervals,
         })
 
     except Exception as e:
@@ -89,6 +129,7 @@ def update_subtitles():
         data = request.get_json()
         video_hash = data.get('video_hash')
         updated_subtitles = data.get('subtitles')
+        forbidden_words = data.get('forbidden_words')
 
         if not video_hash or not updated_subtitles:
             return jsonify({'status': 'error', 'message': 'Dados incompletos'}), 400
@@ -103,6 +144,12 @@ def update_subtitles():
 
         # Atualizar legendas
         session_data['subtitles'] = updated_subtitles
+        if forbidden_words is not None:
+            filtered_words = [str(word).strip() for word in forbidden_words if str(word).strip()]
+            if filtered_words:
+                session_data['forbidden_words'] = filtered_words
+            else:
+                session_data['forbidden_words'] = list(settings.profanity_words)
 
         # Salvar sessão atualizada
         with open(session_file, 'w', encoding='utf-8') as f:
@@ -121,12 +168,12 @@ def update_subtitles():
 def render_final_video():
     """Renderiza o vídeo final com as legendas editadas"""
     try:
-        from utils.CreateVideoWinthSubtitles import create_video_with_subtitles
         from flask import send_file
-        
+
         data = request.get_json()
         video_hash = data.get('video_hash')
         subtitle_config = data.get('subtitle_config', {})
+        requested_words = data.get('forbidden_words')
 
         if not video_hash:
             return jsonify({'status': 'error', 'message': 'Hash do vídeo é obrigatório'}), 400
@@ -141,17 +188,47 @@ def render_final_video():
 
         video_path = session_data['video_path']
         subtitles = session_data['subtitles']
+        session_words = session_data.get('forbidden_words', list(settings.profanity_words))
+
+        if isinstance(requested_words, (list, tuple)):
+            forbidden_words = [str(word).strip() for word in requested_words if str(word).strip()]
+            if not forbidden_words:
+                forbidden_words = session_words
+        else:
+            forbidden_words = session_words
 
         # Converter legendas para o formato esperado
-        subtitle_tuples = [(sub['start'], sub['end'], sub['text']) for sub in subtitles]
+        segment_dicts = [
+            {
+                'start': sub['start'],
+                'end': sub['end'],
+                'text': sub.get('raw_text', sub['text']),
+            }
+            for sub in subtitles
+        ]
+
+        sanitized_subtitles, beep_intervals = censor_segments(
+            segment_dicts,
+            forbidden_words=forbidden_words,
+        )
+
+        subtitle_tuples = sanitized_subtitles
 
         # Caminho do vídeo final
         output_video_name = f"final_{video_hash}.mp4"
         output_video_path = os.path.join('uploads', output_video_name)
 
         # Renderizar vídeo
-        font_path = "C:\\Windows\\Fonts\\arial.ttf"
-        create_video_with_subtitles(video_path, subtitle_tuples, output_video_path, font_path)
+        subtitle_options = SubtitleRenderingOptions(font_path=str(settings.font_path))
+        create_video_with_subtitles(
+            video_path,
+            subtitle_tuples,
+            output_video_path,
+            subtitle_options,
+            beep_intervals=beep_intervals,
+            beep_frequency=settings.beep_frequency,
+            beep_volume=settings.beep_volume,
+        )
 
         return send_file(output_video_path, as_attachment=False, mimetype='video/mp4')
 

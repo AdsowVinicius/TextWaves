@@ -1,10 +1,40 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import ForbiddenWordsSelector from "./ForbiddenWordsSelector";
 import styles from "./Projeto.module.css";
+
+const API_BASE = "http://127.0.0.1:5000";
 
 const Projeto = () => {
   const [videoFile, setVideoFile] = useState(null);
-  const [displayVideoURL, setDisplayVideoURL] = useState(""); // Single video URL state
+  const [displayVideoURL, setDisplayVideoURL] = useState("");
   const [responseMessage, setResponseMessage] = useState("");
+  const [availableWords, setAvailableWords] = useState([]);
+  const [selectedWords, setSelectedWords] = useState([]);
+  const [isFetchingWords, setIsFetchingWords] = useState(false);
+  const [wordsError, setWordsError] = useState(null);
+
+  useEffect(() => {
+    const loadWords = async () => {
+      setIsFetchingWords(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/config/profanity_words`);
+        if (!response.ok) {
+          throw new Error("Não foi possível carregar as palavras sugeridas");
+        }
+        const data = await response.json();
+        const defaults = data.words || data.default_words || [];
+        setAvailableWords(defaults);
+        setSelectedWords(defaults);
+      } catch (error) {
+        console.error("Erro ao buscar palavras proibidas", error);
+        setWordsError(error.message);
+      } finally {
+        setIsFetchingWords(false);
+      }
+    };
+
+    loadWords();
+  }, []);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -25,9 +55,12 @@ const Projeto = () => {
 
     const formData = new FormData();
     formData.append("video", videoFile);
+    if (selectedWords.length > 0) {
+      formData.append("forbidden_words", JSON.stringify(selectedWords));
+    }
 
     try {
-      const response = await fetch("http://127.0.0.1:5000/process_video", {
+      const response = await fetch(`${API_BASE}/process_video`, {
         method: "POST",
         body: formData,
       });
@@ -35,7 +68,7 @@ const Projeto = () => {
       if (response.ok) {
         const blob = await response.blob();
         const videoURL = URL.createObjectURL(blob);
-        setDisplayVideoURL(videoURL); // Replace the current video URL
+        setDisplayVideoURL(videoURL);
         setResponseMessage("Vídeo processado com sucesso!");
       } else {
         const errorData = await response.json();
@@ -50,23 +83,38 @@ const Projeto = () => {
     <div className={styles.background}>
       <div className={styles.conteudoProjeto}>
         <h1>Upload de Vídeo</h1>
+
+        <section className={styles.wordsSection}>
+          {isFetchingWords ? (
+            <p>Carregando palavras sugeridas...</p>
+          ) : (
+            <ForbiddenWordsSelector
+              availableWords={availableWords}
+              selectedWords={selectedWords}
+              onChange={setSelectedWords}
+              label="Palavras proibidas para este vídeo"
+            />
+          )}
+          {wordsError && <p className={styles.error}>{wordsError}</p>}
+        </section>
+
         {displayVideoURL && (
-          <div>
+          <div className={styles.previewWrapper}>
             <h2>Vídeo:</h2>
             <video
               key={displayVideoURL}
               src={displayVideoURL}
               controls
-              width="300"
+              width="320"
             />
           </div>
         )}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className={styles.form}>
           <input type="file" accept="video/*" onChange={handleFileChange} />
           <button type="submit">Enviar</button>
         </form>
 
-        {responseMessage && <p>{responseMessage}</p>}
+        {responseMessage && <p className={styles.response}>{responseMessage}</p>}
       </div>
     </div>
   );

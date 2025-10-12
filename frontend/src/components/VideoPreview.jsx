@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ForbiddenWordsSelector, { buildMaskRegExp } from './ForbiddenWordsSelector';
 import styles from './VideoPreview.module.css';
+
+const API_BASE = 'http://127.0.0.1:5000';
 
 const VideoPreview = () => {
   const [videoFile, setVideoFile] = useState(null);
@@ -15,6 +18,57 @@ const VideoPreview = () => {
     backgroundColor: 'rgba(0,0,0,0.8)',
     position: 'bottom'
   });
+  const [availableWords, setAvailableWords] = useState([]);
+  const [selectedWords, setSelectedWords] = useState([]);
+  const [isFetchingWords, setIsFetchingWords] = useState(false);
+  const [wordsError, setWordsError] = useState(null);
+  useEffect(() => {
+    const fetchWords = async () => {
+      setIsFetchingWords(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/config/profanity_words`);
+        if (!response.ok) {
+          throw new Error('Não foi possível carregar as palavras sugeridas');
+        }
+        const data = await response.json();
+        const defaults = data.words || data.default_words || [];
+        setAvailableWords(defaults);
+        setSelectedWords(defaults);
+      } catch (error) {
+        console.error('Erro ao carregar palavras proibidas', error);
+        setWordsError(error.message);
+      } finally {
+        setIsFetchingWords(false);
+      }
+    };
+
+    fetchWords();
+  }, []);
+
+  useEffect(() => {
+    setSubtitles((prev) => {
+      if (!prev.length) {
+        return prev;
+      }
+
+      const pattern = buildMaskRegExp(selectedWords);
+      return prev.map((subtitle) => {
+        const baseText = subtitle.raw_text ?? subtitle.text ?? '';
+        if (!pattern) {
+          if (subtitle.text === baseText) {
+            return subtitle;
+          }
+          return { ...subtitle, text: baseText };
+        }
+
+        const masked = baseText.replace(pattern, '******');
+        if (masked === subtitle.text) {
+          return subtitle;
+        }
+        return { ...subtitle, text: masked };
+      });
+    });
+  }, [selectedWords]);
 
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -29,9 +83,12 @@ const VideoPreview = () => {
 
     const formData = new FormData();
     formData.append('video', file);
+    if (selectedWords.length > 0) {
+      formData.append('forbidden_words', JSON.stringify(selectedWords));
+    }
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/process_video_preview', {
+      const response = await fetch(`${API_BASE}/process_video_preview`, {
         method: 'POST',
         body: formData,
       });
@@ -41,6 +98,9 @@ const VideoPreview = () => {
       if (data.status === 'success') {
         setVideoHash(data.video_hash);
         setSubtitles(data.subtitles);
+        if (Array.isArray(data.forbidden_words) && data.forbidden_words.length) {
+          setSelectedWords(data.forbidden_words);
+        }
         
         // Criar URL do vídeo para preview
         const videoURL = URL.createObjectURL(file);
@@ -81,7 +141,13 @@ const VideoPreview = () => {
   // Atualizar texto da legenda
   const updateSubtitleText = (index, newText) => {
     const updatedSubtitles = [...subtitles];
-    updatedSubtitles[index].text = newText;
+    const pattern = buildMaskRegExp(selectedWords);
+    const maskedText = pattern ? newText.replace(pattern, '******') : newText;
+    updatedSubtitles[index] = {
+      ...updatedSubtitles[index],
+      text: maskedText,
+      raw_text: newText,
+    };
     setSubtitles(updatedSubtitles);
   };
 
@@ -97,14 +163,15 @@ const VideoPreview = () => {
     if (!videoHash) return;
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/update_subtitles', {
+      const response = await fetch(`${API_BASE}/update_subtitles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           video_hash: videoHash,
-          subtitles: subtitles
+          subtitles: subtitles,
+          forbidden_words: selectedWords,
         }),
       });
 
@@ -124,14 +191,15 @@ const VideoPreview = () => {
     setIsProcessing(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/render_final_video', {
+      const response = await fetch(`${API_BASE}/render_final_video`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           video_hash: videoHash,
-          subtitle_config: subtitleConfig
+          subtitle_config: subtitleConfig,
+          forbidden_words: selectedWords,
         }),
       });
 
@@ -188,6 +256,20 @@ const VideoPreview = () => {
             </button>
           </div>
         )}
+      </div>
+
+      <div className={styles.wordsPanel}>
+        {isFetchingWords ? (
+          <p>Carregando palavras sugeridas...</p>
+        ) : (
+          <ForbiddenWordsSelector
+            availableWords={availableWords}
+            selectedWords={selectedWords}
+            onChange={setSelectedWords}
+            label="Palavras proibidas"
+          />
+        )}
+        {wordsError && <p className={styles.wordsError}>{wordsError}</p>}
       </div>
 
       {videoFile && (

@@ -1,77 +1,78 @@
-import os
-from .audioExtract import extract_audio_from_video
-from .CreateVideoWinthSubtitles import (
-    SubtitleRenderingOptions,
-    create_video_with_subtitles,
-)
-from .profanity_filter import censor_segments
-from .detectPauses import detect_pauses
-from .transcribeAudio import transcribe_audio
-import os
+from __future__ import annotations
+
 import hashlib
-from datetime import datetime
-from .CreateVideoWinthSubtitles import create_video_with_subtitles
+import logging
+from pathlib import Path
+from typing import Iterable
 
-def generate_str_file_and_video(video_path, backend_directory, name_output):
-    # Configuração de diretórios
-    subtitles_dir = os.path.join(backend_directory, 'videosSubtitles')
-    os.makedirs(subtitles_dir, exist_ok=True)
+from app.config import settings
+from .audioExtract import extract_audio_from_video
+from .CreateVideoWinthSubtitles import SubtitleRenderingOptions, create_video_with_subtitles
+from .profanity_filter import censor_segments
+from .transcribeAudio import transcribe_audio
 
-    # Gerar hash único baseado no conteúdo do vídeo
-    with open(video_path, 'rb') as video_file:
+
+logger = logging.getLogger(__name__)
+
+
+def generate_str_file_and_video(
+    video_path: str,
+    backend_directory: str | None,
+    name_output: str,
+    forbidden_words: Iterable[str] | None = None,
+) -> tuple[str, str, str]:
+    source_video = Path(video_path)
+    if not source_video.exists():
+        raise FileNotFoundError(f"Vídeo de origem não encontrado: {source_video}")
+
+    base_dir = Path(backend_directory) if backend_directory else settings.base_dir.parent
+    subtitles_dir = (base_dir / settings.subtitles_dir_name).resolve()
+    subtitles_dir.mkdir(parents=True, exist_ok=True)
+
+    with source_video.open('rb') as video_file:
         video_hash = hashlib.sha256(video_file.read()).hexdigest()[:10]
-    print(video_hash)
-    # Caminhos dos arquivos de saída
-    output_video_path = os.path.join(subtitles_dir, f"{video_hash}_{name_output}.mp4")
-    str_file_path = os.path.join(subtitles_dir, f"{video_hash}.str")
+    logger.info("Processando vídeo %s | hash=%s", source_video, video_hash)
 
-    # Passo 1: Extrair áudio do vídeo
-    audio_path = os.path.join(subtitles_dir, f"{video_hash}_{name_output}.wav")
-    audio_path = os.path.join(subtitles_dir, "temp_audio.wav")
-    print("######################-setando caminho e extraindo audio-################")
-    print(audio_path)
-    print(video_path)
-    extract_audio_from_video(video_path, audio_path)
-    
-    print("######################- audio extraido -################")
-    print(audio_path)
-    # Passo 3: Transcrever o áudio
-    transcribed_result = transcribe_audio(audio_path)
-    segments = transcribed_result['segments']
-    
-    print("######################-transcreveu audio e segmentou-################")
-    print(segments)
+    output_video_path = subtitles_dir / f"{video_hash}_{name_output}.mp4"
+    str_file_path = subtitles_dir / f"{video_hash}.str"
+    audio_path = subtitles_dir / f"temp_audio_{video_hash}.wav"
 
-    subtitles, beep_intervals = censor_segments(segments)
+    try:
+        extract_audio_from_video(str(source_video), str(audio_path))
+        logger.debug("Áudio temporário gerado em %s", audio_path)
 
-    # Passo 5: Criar arquivo .str
-    with open(str_file_path, 'w') as f:
-        for start, end, text in subtitles:
-            f.write(f"{start:.3f} --> {end:.3f}\n")  # Tempo em segundos
-            f.write(f"{text}\n\n")
-    print("######################-str file-################")
-    print(str_file_path)
-    # Passo 6: Criar novo vídeo com legendas
-    
-    print("######################- iniciando integração de legendas -################")
-    font_path = "C:\\Windows\\Fonts\\arial.ttf"  # Caminho para a fonte Arial no Windows
-    subtitle_options = SubtitleRenderingOptions(font_path=font_path)
+        transcribed_result = transcribe_audio(str(audio_path))
+        segments = transcribed_result['segments']
+        logger.debug("%d segmentos transcritos", len(segments))
 
-    create_video_with_subtitles(
-        video_path,
-        subtitles,
-        output_video_path,
-        subtitle_options,
-        beep_intervals=beep_intervals,
-    )
+        subtitles, beep_intervals = censor_segments(segments, forbidden_words=forbidden_words)
 
-    print("######################--################")
+        with str_file_path.open('w', encoding='utf-8') as str_file:
+            for start, end, text in subtitles:
+                str_file.write(f"{start:.3f} --> {end:.3f}\n{text}\n\n")
+        logger.info("Arquivo .str salvo em %s", str_file_path)
 
-    # Limpeza: Remover arquivo de áudio temporário
-    os.remove(audio_path)
+        subtitle_options = SubtitleRenderingOptions(font_path=str(settings.font_path))
 
-    print(f"Arquivo .str salvo em: {str_file_path}")
-    print(f"Novo vídeo salvo em: {output_video_path}")
-    return str_file_path, output_video_path, video_hash
+        create_video_with_subtitles(
+            str(source_video),
+            subtitles,
+            str(output_video_path),
+            subtitle_options,
+            beep_intervals=beep_intervals,
+            beep_frequency=settings.beep_frequency,
+            beep_volume=settings.beep_volume,
+        )
+        logger.info("Novo vídeo com legendas salvo em %s", output_video_path)
+
+    finally:
+        if audio_path.exists():
+            try:
+                audio_path.unlink()
+                logger.debug("Arquivo de áudio temporário removido: %s", audio_path)
+            except OSError:
+                logger.warning("Não foi possível remover o áudio temporário: %s", audio_path)
+
+    return str(str_file_path), str(output_video_path), video_hash
 
     
