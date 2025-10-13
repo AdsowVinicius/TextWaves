@@ -4,7 +4,7 @@ import json
 import os
 import hashlib
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 
 try:
     from app.config import settings
@@ -13,6 +13,7 @@ except ImportError:  # pragma: no cover - fallback for script execution
 from utils.audioExtract import extract_audio_from_video
 from utils.transcribeAudio import transcribe_audio
 from utils.profanity_filter import censor_segments
+from utils.session_cleaner import clean_session_by_hash
 from utils.CreateVideoWinthSubtitles import (
     SubtitleRenderingOptions,
     create_video_with_subtitles,
@@ -133,6 +134,7 @@ def update_subtitles():
         video_hash = data.get('video_hash')
         updated_subtitles = data.get('subtitles')
         forbidden_words = data.get('forbidden_words')
+        beep_intervals = data.get('beep_intervals')  # Novo: aceitar beeps editados
 
         if not video_hash or not updated_subtitles:
             return jsonify({'status': 'error', 'message': 'Dados incompletos'}), 400
@@ -153,6 +155,10 @@ def update_subtitles():
                 session_data['forbidden_words'] = filtered_words
             else:
                 session_data['forbidden_words'] = list(settings.profanity_words)
+        
+        # Atualizar beep intervals se fornecidos
+        if beep_intervals is not None:
+            session_data['beep_intervals'] = beep_intervals
 
         # Salvar sessão atualizada
         with open(session_file, 'w', encoding='utf-8') as f:
@@ -160,7 +166,7 @@ def update_subtitles():
 
         return jsonify({
             'status': 'success',
-            'message': 'Legendas atualizadas com sucesso'
+            'message': 'Legendas e beeps atualizados com sucesso'
         })
 
     except Exception as e:
@@ -171,12 +177,11 @@ def update_subtitles():
 def render_final_video():
     """Renderiza o vídeo final com as legendas editadas"""
     try:
-        from flask import send_file
-
         data = request.get_json()
         video_hash = data.get('video_hash')
         subtitle_config = data.get('subtitle_config', {})
         requested_words = data.get('forbidden_words')
+        custom_beep_intervals = data.get('beep_intervals')  # Novo: beeps editados do frontend
 
         if not video_hash:
             return jsonify({'status': 'error', 'message': 'Hash do vídeo é obrigatório'}), 400
@@ -200,22 +205,28 @@ def render_final_video():
         else:
             forbidden_words = session_words
 
-        # Converter legendas para o formato esperado
-        segment_dicts = [
-            {
-                'start': sub['start'],
-                'end': sub['end'],
-                'text': sub.get('raw_text', sub['text']),
-            }
-            for sub in subtitles
-        ]
+        # Usar beeps editados se fornecidos, senão recalcular
+        if custom_beep_intervals is not None and isinstance(custom_beep_intervals, list):
+            # Usar beeps editados pelo usuário
+            beep_intervals = [(float(b[0]), float(b[1])) for b in custom_beep_intervals]
+        else:
+            # Recalcular beeps automaticamente
+            segment_dicts = [
+                {
+                    'start': sub['start'],
+                    'end': sub['end'],
+                    'text': sub.get('raw_text', sub['text']),
+                }
+                for sub in subtitles
+            ]
 
-        sanitized_subtitles, beep_intervals = censor_segments(
-            segment_dicts,
-            forbidden_words=forbidden_words,
-        )
+            sanitized_subtitles, beep_intervals = censor_segments(
+                segment_dicts,
+                forbidden_words=forbidden_words,
+            )
 
-        subtitle_tuples = sanitized_subtitles
+        # Sempre usar legendas da sessão (já editadas)
+        subtitle_tuples = [(sub['start'], sub['end'], sub['text']) for sub in subtitles]
 
         # Caminho do vídeo final
         output_video_name = f"final_{video_hash}.mp4"
@@ -232,6 +243,10 @@ def render_final_video():
             beep_frequency=settings.beep_frequency,
             beep_volume=settings.beep_volume,
         )
+
+        # Limpar sessão e arquivos temporários após renderização
+        # (mantém apenas o vídeo final por 24h para download)
+        clean_session_by_hash(video_hash)
 
         return send_file(output_video_path, as_attachment=False, mimetype='video/mp4')
 
@@ -255,6 +270,27 @@ def get_session(video_hash):
             'status': 'success',
             'data': session_data
         })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@preview_bp.route('/get_video/<video_hash>', methods=['GET'])
+def get_video(video_hash):
+    """Serve o vídeo original para preview"""
+    try:
+        session_file = os.path.join('uploads', f"session_{video_hash}.json")
+        if not os.path.exists(session_file):
+            return jsonify({'status': 'error', 'message': 'Sessão não encontrada'}), 404
+
+        with open(session_file, 'r', encoding='utf-8') as f:
+            session_data = json.load(f)
+
+        video_path = session_data.get('video_path')
+        if not video_path or not os.path.exists(video_path):
+            return jsonify({'status': 'error', 'message': 'Vídeo não encontrado'}), 404
+
+        return send_file(video_path, mimetype='video/mp4')
 
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500

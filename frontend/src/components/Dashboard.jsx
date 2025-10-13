@@ -25,9 +25,16 @@ const Dashboard = () => {
       if (response.ok) {
         const data = await response.json();
         setStats(data.stats);
+      } else if (response.status === 403) {
+        console.warn('Acesso negado às estatísticas. Verifique se você é admin.');
+        setStats(null);
+      } else {
+        console.error('Erro ao carregar estatísticas:', response.status);
+        setStats(null);
       }
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
+      setStats(null);
     } finally {
       setLoading(false);
     }
@@ -93,7 +100,19 @@ const Dashboard = () => {
           <div className="tab-content">
             <h2>📊 Visão Geral</h2>
             
-            {isAdmin() && stats && (
+            {isAdmin() && loading && (
+              <div className="loading-state">
+                <p>Carregando estatísticas...</p>
+              </div>
+            )}
+            
+            {isAdmin() && !loading && stats === null && (
+              <div className="info-message">
+                <p>ℹ️ Não foi possível carregar as estatísticas. Verifique suas permissões.</p>
+              </div>
+            )}
+            
+            {isAdmin() && !loading && stats && (
               <div className="stats-grid">
                 <div className="stat-card">
                   <h3>👥 Total de Usuários</h3>

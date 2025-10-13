@@ -66,7 +66,7 @@ const Projeto = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/process_video_preview`, {
+      const response = await fetch(`${API_BASE}/api/process_video_preview`, {
         method: "POST",
         body: formData,
       });

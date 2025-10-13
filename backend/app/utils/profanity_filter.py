@@ -19,14 +19,14 @@ def _build_pattern(words: Iterable[str]) -> re.Pattern:
 def censor_segments(
     segments: Sequence[dict],
     forbidden_words: Iterable[str] | None = None,
-    replacement: str = "******",
+    replacement: str | None = None,
 ) -> tuple[list[tuple[float, float, str]], list[tuple[float, float]]]:
     """Return sanitized subtitles and the intervals that should be beeped.
 
     Args:
         segments: Iterable with Whisper-like segments containing start, end, text.
         forbidden_words: optional list of forbidden words. Defaults to DEFAULT_FORBIDDEN_WORDS.
-        replacement: text used to mask the forbidden word inside the subtitles.
+        replacement: deprecated, ignored (cada palavra é mascarada com asteriscos iguais ao tamanho).
 
     Returns:
         (sanitized_subtitles, beep_intervals)
@@ -44,15 +44,40 @@ def censor_segments(
         start = float(segment.get("start", 0.0))
         end = float(segment.get("end", start))
         text = str(segment.get("text", ""))
+        duration = end - start
 
+        # Encontrar todas as ocorrências de palavras proibidas
+        matches = list(pattern.finditer(text))
+        
+        if matches:
+            # Calcular timing aproximado de cada palavra dentro do segmento
+            words_in_segment = text.split()
+            total_words = len(words_in_segment)
+            
+            for match in matches:
+                matched_word = match.group(0)
+                word_length = len(matched_word)
+                
+                # Estimar posição temporal da palavra no segmento
+                # Baseado na posição do caractere no texto
+                char_pos = match.start()
+                char_ratio = char_pos / len(text) if len(text) > 0 else 0
+                
+                # Estimar duração da palavra (proporcional ao tamanho)
+                avg_word_duration = duration / total_words if total_words > 0 else duration
+                word_duration = avg_word_duration * 0.8  # Palavra individual é menor que média
+                
+                # Calcular timing do beep
+                word_start = start + (duration * char_ratio)
+                word_end = min(word_start + word_duration, end)
+                
+                beep_intervals.append((word_start, word_end))
+        
+        # Substituir cada palavra pelo número correto de asteriscos
         def _mask(match: re.Match) -> str:
-            return replacement
-
-        new_text, substitutions = pattern.subn(_mask, text)
-
-        if substitutions > 0:
-            beep_intervals.append((start, end))
-
+            return '*' * len(match.group(0))
+        
+        new_text = pattern.sub(_mask, text)
         sanitized.append((start, end, new_text))
 
     return sanitized, beep_intervals

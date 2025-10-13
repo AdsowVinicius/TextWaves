@@ -22,6 +22,8 @@ const VideoPreview = () => {
   const [selectedWords, setSelectedWords] = useState([]);
   const [isFetchingWords, setIsFetchingWords] = useState(false);
   const [wordsError, setWordsError] = useState(null);
+  const [beepIntervals, setBeepIntervals] = useState([]); // Novo: intervalos de beep
+  const [showBeepEditor, setShowBeepEditor] = useState(false); // Novo: mostrar editor de beeps
   useEffect(() => {
     const fetchWords = async () => {
       setIsFetchingWords(true);
@@ -84,7 +86,7 @@ const VideoPreview = () => {
   const loadExistingSession = async (hash) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/get_session/${hash}`);
+      const response = await fetch(`${API_BASE}/api/get_session/${hash}`);
       const data = await response.json();
 
       if (data.status === 'success') {
@@ -96,11 +98,9 @@ const VideoPreview = () => {
           setSelectedWords(data.data.forbidden_words);
         }
 
-        // Carregar o vídeo original
-        const videoPath = data.data.video_path;
-        if (videoRef.current && videoPath) {
-          // Para vídeos já no servidor, precisamos de um endpoint que sirva o arquivo
-          videoRef.current.src = videoPath;
+        // Carregar o vídeo do servidor
+        if (videoRef.current) {
+          videoRef.current.src = `${API_BASE}/api/get_video/${hash}`;
         }
       } else {
         alert(`Erro ao carregar sessão: ${data.message}`);
@@ -128,7 +128,7 @@ const VideoPreview = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/process_video_preview`, {
+      const response = await fetch(`${API_BASE}/api/process_video_preview`, {
         method: 'POST',
         body: formData,
       });
@@ -140,6 +140,15 @@ const VideoPreview = () => {
         setSubtitles(data.subtitles);
         if (Array.isArray(data.forbidden_words) && data.forbidden_words.length) {
           setSelectedWords(data.forbidden_words);
+        }
+        // Carregar intervalos de beep se disponíveis
+        if (Array.isArray(data.beep_intervals)) {
+          setBeepIntervals(data.beep_intervals.map((interval, index) => ({
+            id: index,
+            start: interval[0],
+            end: interval[1],
+            word: interval[2] || 'desconhecida' // palavra relacionada, se disponível
+          })));
         }
         
         // Criar URL do vídeo para preview
@@ -198,12 +207,36 @@ const VideoPreview = () => {
     setSubtitles(updatedSubtitles);
   };
 
+  // Atualizar timing do beep
+  const updateBeepTiming = (id, field, value) => {
+    const updatedBeeps = beepIntervals.map(beep =>
+      beep.id === id ? { ...beep, [field]: parseFloat(value) } : beep
+    );
+    setBeepIntervals(updatedBeeps);
+  };
+
+  // Remover beep
+  const removeBeep = (id) => {
+    setBeepIntervals(beepIntervals.filter(beep => beep.id !== id));
+  };
+
+  // Adicionar novo beep
+  const addBeep = () => {
+    const newId = beepIntervals.length > 0 ? Math.max(...beepIntervals.map(b => b.id)) + 1 : 0;
+    setBeepIntervals([...beepIntervals, {
+      id: newId,
+      start: currentTime,
+      end: currentTime + 0.5,
+      word: 'manual'
+    }]);
+  };
+
   // Salvar alterações das legendas
   const saveSubtitles = async () => {
     if (!videoHash) return;
 
     try {
-      const response = await fetch(`${API_BASE}/update_subtitles`, {
+      const response = await fetch(`${API_BASE}/api/update_subtitles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -212,12 +245,13 @@ const VideoPreview = () => {
           video_hash: videoHash,
           subtitles: subtitles,
           forbidden_words: selectedWords,
+          beep_intervals: beepIntervals.map(b => [b.start, b.end]), // Incluir beeps editados
         }),
       });
 
       const data = await response.json();
       if (data.status === 'success') {
-        alert('Legendas salvas com sucesso!');
+        alert('Legendas e beeps salvos com sucesso!');
       }
     } catch (error) {
       alert(`Erro ao salvar: ${error.message}`);
@@ -231,7 +265,7 @@ const VideoPreview = () => {
     setIsProcessing(true);
 
     try {
-      const response = await fetch(`${API_BASE}/render_final_video`, {
+      const response = await fetch(`${API_BASE}/api/render_final_video`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -240,6 +274,7 @@ const VideoPreview = () => {
           video_hash: videoHash,
           subtitle_config: subtitleConfig,
           forbidden_words: selectedWords,
+          beep_intervals: beepIntervals.map(b => [b.start, b.end]), // Incluir beeps editados
         }),
       });
 
@@ -452,6 +487,111 @@ const VideoPreview = () => {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Editor de Beeps */}
+            <div className={styles.beepsSection}>
+              <div className={styles.beepsHeader}>
+                <h3>🔊 Intervalos de Beep ({beepIntervals.length})</h3>
+                <button
+                  onClick={() => setShowBeepEditor(!showBeepEditor)}
+                  className={styles.toggleBtn}
+                >
+                  {showBeepEditor ? 'Ocultar' : 'Mostrar'} Editor
+                </button>
+              </div>
+
+              {showBeepEditor && (
+                <div className={styles.beepsEditor}>
+                  <div className={styles.beepsInfo}>
+                    <p>ℹ️ Os beeps são calculados automaticamente baseados nas palavras proibidas.</p>
+                    <p>Você pode ajustar o timing ou adicionar beeps manualmente.</p>
+                  </div>
+
+                  <button
+                    onClick={addBeep}
+                    className={styles.addBeepBtn}
+                    disabled={!videoHash}
+                  >
+                    ➕ Adicionar Beep no Tempo Atual ({formatTime(currentTime)})
+                  </button>
+
+                  <div className={styles.beepsList}>
+                    {beepIntervals.length === 0 && (
+                      <p className={styles.emptyState}>Nenhum beep encontrado. Adicione palavras proibidas ou crie beeps manualmente.</p>
+                    )}
+
+                    {beepIntervals.map((beep) => (
+                      <div key={beep.id} className={styles.beepItem}>
+                        <div className={styles.beepHeader}>
+                          <span className={styles.beepWord}>
+                            🔇 Beep #{beep.id + 1} 
+                            {beep.word && beep.word !== 'manual' && ` (${beep.word})`}
+                          </span>
+                          <button
+                            onClick={() => seekToTime(beep.start)}
+                            className={styles.seekBtn}
+                          >
+                            ▶ Ir para {formatTime(beep.start)}
+                          </button>
+                        </div>
+
+                        <div className={styles.beepTimingInputs}>
+                          <label>
+                            Início (s):
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={beep.start.toFixed(2)}
+                              onChange={(e) => updateBeepTiming(beep.id, 'start', e.target.value)}
+                              className={styles.timeInput}
+                            />
+                          </label>
+
+                          <label>
+                            Fim (s):
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={beep.end.toFixed(2)}
+                              onChange={(e) => updateBeepTiming(beep.id, 'end', e.target.value)}
+                              className={styles.timeInput}
+                            />
+                          </label>
+
+                          <label>
+                            Duração:
+                            <span className={styles.duration}>
+                              {(beep.end - beep.start).toFixed(2)}s
+                            </span>
+                          </label>
+
+                          <button
+                            onClick={() => removeBeep(beep.id)}
+                            className={styles.removeBtn}
+                            title="Remover beep"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+
+                        <div className={styles.beepPreview}>
+                          <div 
+                            className={styles.beepBar}
+                            style={{
+                              background: currentTime >= beep.start && currentTime <= beep.end 
+                                ? '#ff4444' 
+                                : '#666'
+                            }}
+                          >
+                            {currentTime >= beep.start && currentTime <= beep.end && '🔊 ATIVO'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Botões de Ação */}

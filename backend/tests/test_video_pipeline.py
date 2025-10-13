@@ -55,5 +55,10 @@ def test_generate_pipeline_masks_profanity_and_beeps(monkeypatch, tmp_path):
     contents = Path(str_path).read_text(encoding="utf-8")
     assert "******" in contents
 
-    assert captured["beep_intervals"] == [(0.0, 1.0)]
+    # Beeps agora são precisos por palavra, não por segmento inteiro
+    assert len(captured["beep_intervals"]) == 1  # Uma ocorrência de "abelha"
+    beep_start, beep_end = captured["beep_intervals"][0]
+    # O beep deve estar dentro do segmento (0.0, 1.0)
+    assert 0.0 <= beep_start < beep_end <= 1.0
+    
     assert captured["subtitles"][0][2] == "A ****** chegou aqui"

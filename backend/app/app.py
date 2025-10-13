@@ -14,6 +14,7 @@ from werkzeug.utils import secure_filename
 
 from config import settings
 from utils.generateStrFileVideo import generate_str_file_and_video
+from utils.session_cleaner import startup_cleanup
 
 logging.basicConfig(
     level=os.getenv("TEXTWAVES_LOG_LEVEL", "INFO"),
@@ -48,7 +49,10 @@ from routes.preview_routes import preview_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(users_bp, url_prefix='/api')
-app.register_blueprint(preview_bp)
+app.register_blueprint(preview_bp, url_prefix='/api')
+
+# Executar limpeza de sessões antigas na inicialização (> 24 horas)
+startup_cleanup(max_age_hours=24)
 
 # Diretório para armazenar os vídeos enviados
 app.config['UPLOAD_FOLDER'] = str(settings.upload_dir)

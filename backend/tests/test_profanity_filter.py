@@ -20,16 +20,21 @@ def test_censor_segments_masks_forbidden_words():
     sanitized, beeps = censor_segments(
         segments,
         forbidden_words=["teste"],
-        replacement="[censurado]",
+        replacement="[censurado]",  # replacement é ignorado, usa asteriscos
     )
 
+    # Agora usa asteriscos correspondentes ao tamanho da palavra
     assert sanitized == [
-        (0.0, 1.5, "Palavra [censurado] aparece aqui"),
+        (0.0, 1.5, "Palavra ***** aparece aqui"),  # "teste" = 5 letras
         (2.0, 3.0, "Nada suspeito"),
-        (3.0, 4.0, "Outro [censurado] no final"),
+        (3.0, 4.0, "Outro ***** no final"),  # "Teste" = 5 letras
     ]
 
-    assert beeps == [(0.0, 1.5), (3.0, 4.0)]
+    # Beeps agora são precisos por palavra, não por segmento inteiro
+    assert len(beeps) == 2  # Uma para cada ocorrência de "teste"
+    # Verificar que os beeps estão dentro dos segmentos corretos
+    assert 0.0 <= beeps[0][0] < beeps[0][1] <= 1.5
+    assert 3.0 <= beeps[1][0] < beeps[1][1] <= 4.0
 
 
 def test_censor_segments_no_matches_returns_original():
