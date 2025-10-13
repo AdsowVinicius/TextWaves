@@ -70,7 +70,7 @@ const VideoPreview = () => {
           return { ...subtitle, text: baseText };
         }
 
-        const masked = baseText.replace(pattern, '******');
+  const masked = baseText.replace(pattern, (match) => '*'.repeat(match.length));
         if (masked === subtitle.text) {
           return subtitle;
         }
@@ -81,6 +81,83 @@ const VideoPreview = () => {
 
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const oscillatorRef = useRef(null);
+  const gainNodeRef = useRef(null);
+
+  const stopPreviewBeep = () => {
+    if (oscillatorRef.current) {
+      try {
+        oscillatorRef.current.stop();
+      } catch (error) {
+        console.warn('Oscilador já finalizado:', error);
+      }
+      oscillatorRef.current.disconnect();
+      oscillatorRef.current = null;
+    }
+
+    if (gainNodeRef.current) {
+      gainNodeRef.current.disconnect();
+      gainNodeRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopPreviewBeep();
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close();
+        } catch (error) {
+          console.warn('Erro ao encerrar AudioContext:', error);
+        }
+        audioContextRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!beepIntervals.length) {
+      stopPreviewBeep();
+    }
+  }, [beepIntervals]);
+
+  const startPreviewBeep = (frequency = 1000, volume = 0.3) => {
+    if (oscillatorRef.current) {
+      return;
+    }
+
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) {
+      console.warn('Web Audio API não suportada neste navegador.');
+      return;
+    }
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+
+    const context = audioContextRef.current;
+    if (context.state === 'suspended') {
+      context.resume().catch((error) => {
+        console.warn('Falha ao retomar AudioContext:', error);
+      });
+    }
+
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    gainNode.gain.value = volume;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+
+    oscillator.start();
+    oscillatorRef.current = oscillator;
+    gainNodeRef.current = gainNode;
+  };
 
   // Carregar sessão existente via hash
   const loadExistingSession = async (hash) => {
@@ -96,6 +173,16 @@ const VideoPreview = () => {
         
         if (data.data.forbidden_words) {
           setSelectedWords(data.data.forbidden_words);
+        }
+
+        // Carregar intervalos de beep se disponíveis
+        if (Array.isArray(data.data.beep_intervals)) {
+          setBeepIntervals(data.data.beep_intervals.map((interval, index) => ({
+            id: index,
+            start: interval[0],
+            end: interval[1],
+            word: interval[2] || 'desconhecida'
+          })));
         }
 
         // Carregar o vídeo do servidor
@@ -177,7 +264,26 @@ const VideoPreview = () => {
         time >= sub.start && time <= sub.end
       );
       setActiveSubtitleIndex(activeIndex);
+
+      // Controlar beep no preview
+      const activeBeep = beepIntervals.find(
+        (beep) => time >= beep.start && time <= beep.end
+      );
+
+      if (activeBeep) {
+        startPreviewBeep();
+      } else {
+        stopPreviewBeep();
+      }
     }
+  };
+
+  const handlePause = () => {
+    stopPreviewBeep();
+  };
+
+  const handleEnded = () => {
+    stopPreviewBeep();
   };
 
   // Pular para um momento específico
@@ -245,7 +351,7 @@ const VideoPreview = () => {
           video_hash: videoHash,
           subtitles: subtitles,
           forbidden_words: selectedWords,
-          beep_intervals: beepIntervals.map(b => [b.start, b.end]), // Incluir beeps editados
+          beep_intervals: beepIntervals.map(b => [b.start, b.end, b.word || 'manual']), // Incluir beeps editados
         }),
       });
 
@@ -274,7 +380,7 @@ const VideoPreview = () => {
           video_hash: videoHash,
           subtitle_config: subtitleConfig,
           forbidden_words: selectedWords,
-          beep_intervals: beepIntervals.map(b => [b.start, b.end]), // Incluir beeps editados
+          beep_intervals: beepIntervals.map(b => [b.start, b.end, b.word || 'manual']), // Incluir beeps editados
         }),
       });
 
@@ -356,6 +462,8 @@ const VideoPreview = () => {
                 ref={videoRef}
                 controls
                 onTimeUpdate={handleTimeUpdate}
+                onPause={handlePause}
+                onEnded={handleEnded}
                 className={styles.videoPlayer}
               />
               

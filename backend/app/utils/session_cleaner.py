@@ -98,7 +98,7 @@ def clean_old_sessions(max_age_hours: int = 24) -> dict[str, int]:
     return counters
 
 
-def clean_session_by_hash(video_hash: str) -> bool:
+def clean_session_by_hash(video_hash: str, *, keep_final_video: bool = False) -> bool:
     """Remove uma sessão específica e seus arquivos relacionados.
     
     Args:
@@ -135,8 +135,14 @@ def clean_session_by_hash(video_hash: str) -> bool:
         # Remover vídeo final
         final_video = upload_dir / f"final_{video_hash}.mp4"
         if final_video.exists():
-            final_video.unlink()
-            logger.info(f"Vídeo final removido: {final_video.name}")
+            if keep_final_video:
+                logger.info(
+                    "Vídeo final preservado (keep_final_video=True): %s",
+                    final_video.name,
+                )
+            else:
+                final_video.unlink()
+                logger.info(f"Vídeo final removido: {final_video.name}")
         
         return removed
         

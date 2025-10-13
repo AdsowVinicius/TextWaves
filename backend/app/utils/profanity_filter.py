@@ -20,7 +20,7 @@ def censor_segments(
     segments: Sequence[dict],
     forbidden_words: Iterable[str] | None = None,
     replacement: str | None = None,
-) -> tuple[list[tuple[float, float, str]], list[tuple[float, float]]]:
+) -> tuple[list[tuple[float, float, str]], list[tuple[float, float, str]]]:
     """Return sanitized subtitles and the intervals that should be beeped.
 
     Args:
@@ -38,7 +38,7 @@ def censor_segments(
     pattern = _build_pattern(word_list)
 
     sanitized: list[tuple[float, float, str]] = []
-    beep_intervals: list[tuple[float, float]] = []
+    beep_intervals: list[tuple[float, float, str]] = []
 
     for segment in segments:
         start = float(segment.get("start", 0.0))
@@ -71,7 +71,7 @@ def censor_segments(
                 word_start = start + (duration * char_ratio)
                 word_end = min(word_start + word_duration, end)
                 
-                beep_intervals.append((word_start, word_end))
+                beep_intervals.append((word_start, word_end, matched_word))
         
         # Substituir cada palavra pelo número correto de asteriscos
         def _mask(match: re.Match) -> str:

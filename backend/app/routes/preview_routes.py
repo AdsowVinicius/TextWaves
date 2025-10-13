@@ -208,7 +208,11 @@ def render_final_video():
         # Usar beeps editados se fornecidos, senão recalcular
         if custom_beep_intervals is not None and isinstance(custom_beep_intervals, list):
             # Usar beeps editados pelo usuário
-            beep_intervals = [(float(b[0]), float(b[1])) for b in custom_beep_intervals]
+            beep_intervals = [
+                (float(b[0]), float(b[1]))
+                for b in custom_beep_intervals
+                if isinstance(b, (list, tuple)) and len(b) >= 2
+            ]
         else:
             # Recalcular beeps automaticamente
             segment_dicts = [
@@ -246,7 +250,7 @@ def render_final_video():
 
         # Limpar sessão e arquivos temporários após renderização
         # (mantém apenas o vídeo final por 24h para download)
-        clean_session_by_hash(video_hash)
+        clean_session_by_hash(video_hash, keep_final_video=True)
 
         return send_file(output_video_path, as_attachment=False, mimetype='video/mp4')
 
