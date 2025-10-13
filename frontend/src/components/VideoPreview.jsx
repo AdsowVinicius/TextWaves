@@ -409,10 +409,20 @@ const VideoPreview = () => {
 
   // Formatação de tempo
   const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 1000);
-    return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+    if (!Number.isFinite(seconds)) {
+      return '0:00.000';
+    }
+    const total = Math.max(0, seconds);
+    const mins = Math.floor(total / 60);
+    const secs = Math.floor(total % 60);
+    const ms = Math.round((total - Math.floor(total)) * 1000);
+    const normalizedMs = ms === 1000 ? 0 : ms;
+    const adjustedSecs = ms === 1000 ? secs + 1 : secs;
+    const normalizedSecs = adjustedSecs % 60;
+    const adjustedMins = mins + Math.floor(adjustedSecs / 60);
+    return `${adjustedMins}:${normalizedSecs.toString().padStart(2, '0')}.${normalizedMs
+      .toString()
+      .padStart(3, '0')}`;
   };
 
   return (
@@ -568,8 +578,8 @@ const VideoPreview = () => {
                         Início:
                         <input
                           type="number"
-                          step="0.1"
-                          value={subtitle.start.toFixed(1)}
+                          step="0.001"
+                          value={subtitle.start.toFixed(3)}
                           onChange={(e) => updateSubtitleTiming(index, 'start', e.target.value)}
                           className={styles.timeInput}
                         />
@@ -578,8 +588,8 @@ const VideoPreview = () => {
                         Fim:
                         <input
                           type="number"
-                          step="0.1"
-                          value={subtitle.end.toFixed(1)}
+                          step="0.001"
+                          value={subtitle.end.toFixed(3)}
                           onChange={(e) => updateSubtitleTiming(index, 'end', e.target.value)}
                           className={styles.timeInput}
                         />
@@ -649,8 +659,8 @@ const VideoPreview = () => {
                             Início (s):
                             <input
                               type="number"
-                              step="0.1"
-                              value={beep.start.toFixed(2)}
+                              step="0.001"
+                              value={beep.start.toFixed(3)}
                               onChange={(e) => updateBeepTiming(beep.id, 'start', e.target.value)}
                               className={styles.timeInput}
                             />
@@ -660,8 +670,8 @@ const VideoPreview = () => {
                             Fim (s):
                             <input
                               type="number"
-                              step="0.1"
-                              value={beep.end.toFixed(2)}
+                              step="0.001"
+                              value={beep.end.toFixed(3)}
                               onChange={(e) => updateBeepTiming(beep.id, 'end', e.target.value)}
                               className={styles.timeInput}
                             />
@@ -670,7 +680,7 @@ const VideoPreview = () => {
                           <label>
                             Duração:
                             <span className={styles.duration}>
-                              {(beep.end - beep.start).toFixed(2)}s
+                              {(beep.end - beep.start).toFixed(3)}s
                             </span>
                           </label>
 

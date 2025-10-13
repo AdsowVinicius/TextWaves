@@ -1,4 +1,5 @@
 import re
+import string
 from typing import Iterable, Sequence, Tuple
 
 try:
@@ -48,8 +49,33 @@ def censor_segments(
 
         # Encontrar todas as ocorrências de palavras proibidas
         matches = list(pattern.finditer(text))
+
+        segment_words = segment.get("words")
+        used_precise_timing = False
+        if isinstance(segment_words, list) and segment_words:
+            for word_info in segment_words:
+                raw_word = str(word_info.get("word", ""))
+                if not raw_word.strip():
+                    continue
+
+                if not pattern.search(raw_word):
+                    continue
+
+                precise_start = word_info.get("start")
+                precise_end = word_info.get("end")
+                if precise_start is None or precise_end is None:
+                    continue
+
+                clean_label = raw_word.strip()
+                # Remover pontuações das extremidades para exibir
+                clean_label = clean_label.strip(string.punctuation + " ") or raw_word.strip()
+
+                beep_intervals.append(
+                    (float(precise_start), float(precise_end), clean_label)
+                )
+                used_precise_timing = True
         
-        if matches:
+        if matches and not used_precise_timing:
             # Calcular timing aproximado de cada palavra dentro do segmento
             words_in_segment = text.split()
             total_words = len(words_in_segment)

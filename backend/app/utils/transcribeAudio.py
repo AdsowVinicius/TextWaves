@@ -9,7 +9,12 @@ def transcribe_audio(audio_path):
     
     try:
         model = whisper.load_model("large")
-        transcribed_result = model.transcribe(audio_path, verbose=True)
+        transcribed_result = model.transcribe(
+            audio_path,
+            verbose=False,
+            word_timestamps=True,
+            task="transcribe",
+        )
         return transcribed_result
     except Exception as e:
         print(f"Erro ao transcrever o áudio: {e}")
