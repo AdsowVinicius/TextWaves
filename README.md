@@ -120,66 +120,112 @@ Todos os metadados (usuários, vídeos e permissões) são salvos em SQLite (`in
 ### Desenvolvimento backend
 
 1. Ative o ambiente virtual: `backend\env\Scripts\Activate.ps1`.
-2. Exporte as variáveis obrigatórias (`JWT_SECRET_KEY` pelo menos).
-3. Rode a API em modo debug:
-	```powershell
-	cd backend/app
-	$env:FLASK_APP = "app.py"
-	$env:FLASK_ENV = "development"
-	flask run
-	```
-4. Os logs estruturados aparecerão no console (incluindo etapas do pipeline). Reinicie o servidor após alterar variáveis.
+ # TextWaves — Guia de início rápido (Windows)
 
-### Desenvolvimento frontend
+Este README foi escrito para que alguém sem dependências instaladas consiga rodar o projeto localmente no Windows usando PowerShell.
 
-1. Instale dependências (`npm install`) uma vez.
-2. Inicie o Vite dev server: `npm run dev`.
-3. Configure o proxy/API no `.env` do frontend caso altere a porta do backend (`VITE_API_URL`).
+Resumo do projeto:
+- Backend: Flask + Whisper (transcrição) + MoviePy (render) — gera legendas e aplica beeps para palavras proibidas.
+- Frontend: React (Vite) — UI para upload, edição de beeps e render final.
 
-### Processamento end-to-end local
+> Estas instruções assumem Windows 10/11 e PowerShell. Em macOS/Linux os passos são semelhantes (ajuste paths/instalação do FFmpeg).
 
-1. Garanta que o backend esteja rodando com Whisper configurado (requer FFmpeg).
-2. Pelo frontend, faça login e envie um vídeo via formulário de upload.
-3. O workflow executará automaticamente:
-	- extração de áudio;
-	- transcrição via Whisper;
-	- geração de legendas/intervalos de beep;
-	- renderização do vídeo final no diretório `TEXTWAVES_UPLOAD_DIR`.
-4. Consulte o arquivo JSON de sessão correspondente para detalhes de cada etapa.
+## 1) Instalar o que falta
 
-### Execução de testes e lint rápido
+- Python 3.11: https://www.python.org/downloads/ (marque "Add Python to PATH")
+- Node.js 18+: https://nodejs.org/
+- Git: https://git-scm.com/
+- FFmpeg: https://ffmpeg.org/download.html (ou use o binário incluído em `backend/app/ffmpeg/bin`)
 
-1. Exportar `PYTHONPATH` para apontar para `backend`.
-2. Rodar `pytest backend/tests` (ver comando na seção de testes).
-3. Opcional: validar o frontend com `npm run lint` dentro da pasta `frontend`.
+## 2) Clonar o repositório
 
-## 🔒 Autenticação & Gestão de usuários
+```powershell
+git clone https://github.com/AdsowVinicius/TextWaves.git
+cd TextWaves
+```
 
-- Registro (`POST /api/auth/register`): o primeiro usuário recebe papel `admin`.
-- Login (`POST /api/auth/login`): aceita username ou e-mail, sem diferenciar maiúsculas/minúsculas.
-- Tokens JWT: access (24h) e refresh (30 dias).
-- Logout (`POST /api/auth/logout`): adiciona o token de acesso à blacklist.
-- Refresh (`POST /api/auth/refresh`): gera novo access token a partir de um refresh válido.
+## 3) Backend (Python)
 
-## 🧰 Scripts úteis
+```powershell
+# Criar e ativar virtualenv
+python -m venv backend/env
+backend\env\Scripts\Activate.ps1
 
-- `start_servers.ps1`: sobe API Flask e frontend Vite em paralelo.
-- `backend/tests/*`: exemplos de como mockar o banco SQLite e usar o cliente de teste Flask.
+# Atualizar pip e instalar dependências
+python -m pip install --upgrade pip
+pip install -r backend/requirements.txt
+```
 
-## 🧭 Próximos passos sugeridos
+Observações:
+- Se o `pip install` falhar por falta de compiladores, instale as "Build Tools" do Visual Studio.
 
-- Expandir a UI React para visualizar vídeos já processados e compartilhar acessos.
-- Ajustar os `tests` para rodar em CI (GitHub Actions, por exemplo).
-- Migrar gradualmente o acesso a dados para SQLAlchemy completo (hoje a aplicação mescla ORM e consultas manuais).
-- Permitir configuração de palavras proibidas e parâmetros de beep via painel administrativo.
+## 4) Configurar FFmpeg
 
-## 🤝 Contribuindo
+Se você instalou FFmpeg no sistema, aponte a variável:
 
-1. Crie um fork do projeto.
-2. Abra uma branch descrevendo sua feature/correção.
-3. Garanta que os testes passam (`pytest`).
-4. Abra um Pull Request explicando o contexto e o impacto da mudança.
+```powershell
+$env:TEXTWAVES_FFMPEG_PATH = 'C:\Program Files\ffmpeg\bin\ffmpeg.exe'
+```
 
-## 📄 Licença
+Se for usar o binário interno, confirme que `backend/app/ffmpeg/bin/ffmpeg.exe` existe.
 
-Este projeto é distribuído nos termos da licença incluída no repositório (verifique o arquivo `LICENSE`, se disponível).
+## 5) Frontend (Node)
+
+```powershell
+cd frontend
+npm install
+# Em uma janela separada rode o dev server
+npm run dev
+```
+
+O frontend ficará em `http://localhost:5173`.
+
+## 6) Rodar o backend
+
+Abra outra janela do PowerShell (ative o venv) e execute:
+
+```powershell
+cd backend\app
+$env:JWT_SECRET_KEY = 'sua_chave_de_teste'
+python app.py
+```
+
+Ou use o script que sobe front+back:
+
+```powershell
+..\start_servers.ps1
+```
+
+## 7) Testes
+
+Dentro do virtualenv, rode:
+
+```powershell
+cd backend
+$env:PYTHONPATH = (Resolve-Path .)
+backend\env\Scripts\python.exe -m pytest
+```
+
+## 8) Fluxo básico de uso
+
+1. Abra a UI em `http://localhost:5173`.
+2. Faça upload de um vídeo e aguarde a transcrição (Whisper).
+3. Abra o preview, ajuste beeps se necessário e clique "Gerar Vídeo Final" para baixar o MP4.
+
+## Variáveis de ambiente úteis (PowerShell)
+
+```powershell
+$env:JWT_SECRET_KEY = 'troque_isto_em_producao'
+$env:TEXTWAVES_UPLOAD_DIR = 'C:\caminho\para\uploads'  # opcional
+$env:TEXTWAVES_FFMPEG_PATH = 'C:\Program Files\ffmpeg\bin\ffmpeg.exe'  # opcional
+```
+
+## Troubleshooting rápido
+
+- Erro de CORS / JSON: verifique BACKEND URL e `VITE_API_URL` no frontend.
+- Whisper: se reclamar de FFmpeg, confirme `TEXTWAVES_FFMPEG_PATH` ou o binário em `backend/app/ffmpeg/bin`.
+- Dependências Python falhando: instale Build Tools / use wheels pré-compiladas.
+
+---
+
+Se quiser, eu posso também adicionar passos separados para macOS/Linux, screenshots ou um vídeo curto demonstrando o fluxo.
