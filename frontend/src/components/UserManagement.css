@@ -6,6 +6,11 @@
   margin-bottom: 24px;
 }
 
+.users-header h2,
+.tab-content .users-header h2 {
+  color: #ffffff;
+}
+
 .users-filters {
   background: white;
   padding: 20px;

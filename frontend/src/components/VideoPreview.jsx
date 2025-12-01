@@ -1,18 +1,27 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import ForbiddenWordsSelector, {
-  buildMaskRegExp,
-} from "./ForbiddenWordsSelector";
+import { useNavigate } from "react-router-dom";
+import { buildMaskRegExp } from "./ForbiddenWordsSelector";
 import styles from "./VideoPreview.module.css";
 import { useAuth } from "../context/AuthContext";
 
 const API_BASE = "http://127.0.0.1:5000";
+
+const formatTimestamp = (value) => {
+  if (!value) {
+    return "—";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+};
 
 const VideoPreview = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [videoHash, setVideoHash] = useState(null);
   const [subtitles, setSubtitles] = useState([]);
   const [currentTime, setCurrentTime] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeSubtitleIndex, setActiveSubtitleIndex] = useState(-1);
   const [subtitleConfig, setSubtitleConfig] = useState({
@@ -21,31 +30,32 @@ const VideoPreview = () => {
     backgroundColor: "rgba(0,0,0,0.8)",
     position: "bottom",
   });
-  const [availableWords, setAvailableWords] = useState([]);
   const [selectedWords, setSelectedWords] = useState([]);
-  const [isFetchingWords, setIsFetchingWords] = useState(false);
-  const [wordsError, setWordsError] = useState(null);
-  const [beepIntervals, setBeepIntervals] = useState([]); // Novo: intervalos de beep
-  const [showBeepEditor, setShowBeepEditor] = useState(false); // Novo: mostrar editor de beeps
-  const [progressData, setProgressData] = useState(null); // Novo: rastreamento de progresso SSE
-  const [progressMessage, setProgressMessage] = useState(""); // Novo: mensagem do progresso
+  const [beepIntervals, setBeepIntervals] = useState([]);
+  const [showBeepEditor, setShowBeepEditor] = useState(false);
+  const [progressData, setProgressData] = useState(null);
+  const [progressMessage, setProgressMessage] = useState("");
   const [isWaitingSession, setIsWaitingSession] = useState(false);
+  const [availableSessions, setAvailableSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState("");
+  const [videoSrc, setVideoSrc] = useState("");
   const { apiCall } = useAuth();
+  const navigate = useNavigate();
   const videoRef = useRef(null);
-  const fileInputRef = useRef(null);
   const audioContextRef = useRef(null);
   const oscillatorRef = useRef(null);
   const gainNodeRef = useRef(null);
   const progressSourceRef = useRef(null);
   const retryTimeoutRef = useRef(null);
-  
+  const videoUrlRef = useRef(null);
+
   // Iniciar monitoramento de progresso SSE
   useEffect(() => {
     if (!progressData && videoHash) {
-      // Não fazer nada - o progresso é iniciado no upload
       return;
     }
-  }, [videoHash]);
+  }, [videoHash, progressData]);
 
   // Função para monitorar progresso via SSE
   const monitorProgress = useCallback((sessionHash) => {
@@ -66,7 +76,6 @@ const VideoPreview = () => {
           setProgressData(data);
           setProgressMessage(data.message || "Processando...");
 
-          // Fechar stream quando completar
           if (data.progress >= 100 || data.error) {
             eventSource.close();
             progressSourceRef.current = null;
@@ -90,7 +99,6 @@ const VideoPreview = () => {
   const loadExistingSession = useCallback(
     async (hash, options = {}) => {
       const { skipMonitor = false } = options;
-      setIsLoading(true);
       try {
         const response = await apiCall(`${API_BASE}/api/get_session/${hash}`);
 
@@ -119,27 +127,34 @@ const VideoPreview = () => {
             );
           }
 
-          if (videoRef.current) {
-            try {
-              const videoResponse = await apiCall(
-                `${API_BASE}/api/get_video/${hash}`,
-                {
-                  method: "GET",
-                }
-              );
-              if (videoResponse.ok) {
-                const blob = await videoResponse.blob();
-                const videoURL = URL.createObjectURL(blob);
-                videoRef.current.src = videoURL;
-              } else {
-                console.error(
-                  "Erro ao carregar vídeo para preview",
-                  videoResponse.status
-                );
+          try {
+            const videoResponse = await apiCall(
+              `${API_BASE}/api/get_video/${hash}`,
+              {
+                method: "GET",
               }
-            } catch (loadError) {
-              console.error("Falha ao buscar vídeo original:", loadError);
+            );
+            if (videoResponse.ok) {
+              const blob = await videoResponse.blob();
+              const videoURL = URL.createObjectURL(blob);
+
+              if (videoUrlRef.current) {
+                URL.revokeObjectURL(videoUrlRef.current);
+              }
+              videoUrlRef.current = videoURL;
+              setVideoSrc(videoURL);
+
+              if (videoRef.current) {
+                videoRef.current.src = videoURL;
+              }
+            } else {
+              console.error(
+                "Erro ao carregar vídeo para preview",
+                videoResponse.status
+              );
             }
+          } catch (loadError) {
+            console.error("Falha ao buscar vídeo original:", loadError);
           }
 
           setIsWaitingSession(false);
@@ -176,16 +191,111 @@ const VideoPreview = () => {
           alert(`Erro ao carregar sessão: ${error.message}`);
         }
         return false;
-      } finally {
-        setIsLoading(false);
       }
     },
     [apiCall, monitorProgress]
   );
+
+  const loadAvailableSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    setSessionsError("");
+    try {
+      const response = await apiCall(`${API_BASE}/api/videos`);
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch (jsonError) {
+        payload = {};
+      }
+
+      if (!response.ok) {
+        const message =
+          payload.message ||
+          payload.error ||
+          "Não foi possível carregar os vídeos disponíveis.";
+        throw new Error(message);
+      }
+
+      const videos = Array.isArray(payload.videos) ? payload.videos : [];
+      const ready = videos
+        .filter(
+          (video) =>
+            video &&
+            video.can_resume &&
+            video.status === "preview_ready"
+        )
+        .sort((a, b) => {
+          const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
+          const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+          return dateB - dateA;
+        });
+
+      setAvailableSessions(ready);
+    } catch (error) {
+      console.error("Erro ao carregar sessões disponíveis:", error);
+      setAvailableSessions([]);
+      setSessionsError(error.message || "Erro ao carregar vídeos disponíveis.");
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [apiCall]);
+
+  const handleOpenSession = useCallback(
+    async (hash) => {
+      if (!hash) {
+        return;
+      }
+
+      setSessionsError("");
+      setProgressData(null);
+      setProgressMessage("Carregando sessão...");
+
+      setVideoFile(null);
+      setSubtitles([]);
+      setVideoHash(null);
+      setVideoSrc("");
+      setIsWaitingSession(true);
+
+      if (videoUrlRef.current) {
+        URL.revokeObjectURL(videoUrlRef.current);
+        videoUrlRef.current = null;
+      }
+
+      if (progressSourceRef.current) {
+        progressSourceRef.current.close();
+        progressSourceRef.current = null;
+      }
+
+      navigate(`/Editor?video_hash=${hash}`, { replace: true });
+
+      const success = await loadExistingSession(hash);
+      if (success) {
+        await loadAvailableSessions();
+        setProgressMessage("");
+      } else if (!retryTimeoutRef.current) {
+        setIsWaitingSession(false);
+        setProgressMessage("");
+      }
+    },
+    [loadExistingSession, navigate, loadAvailableSessions]
+  );
+
+  useEffect(() => {
+    if (!videoRef.current) {
+      return;
+    }
+
+    if (videoSrc) {
+      videoRef.current.src = videoSrc;
+      videoRef.current.load();
+    } else {
+      videoRef.current.removeAttribute("src");
+      videoRef.current.load();
+    }
+  }, [videoSrc]);
   
   useEffect(() => {
     const fetchWords = async () => {
-      setIsFetchingWords(true);
       try {
         const response = await fetch(`${API_BASE}/api/config/profanity_words`);
         if (!response.ok) {
@@ -193,13 +303,9 @@ const VideoPreview = () => {
         }
         const data = await response.json();
         const defaults = data.words || data.default_words || [];
-        setAvailableWords(defaults);
         setSelectedWords(defaults);
       } catch (error) {
         console.error("Erro ao carregar palavras proibidas", error);
-        setWordsError(error.message);
-      } finally {
-        setIsFetchingWords(false);
       }
     };
 
@@ -214,6 +320,12 @@ const VideoPreview = () => {
       });
     }
   }, [loadExistingSession]);
+
+  useEffect(() => {
+    if (!videoHash && !isWaitingSession) {
+      loadAvailableSessions();
+    }
+  }, [videoHash, isWaitingSession, loadAvailableSessions]);
 
   useEffect(() => {
     setSubtitles((prev) => {
@@ -277,6 +389,10 @@ const VideoPreview = () => {
         clearTimeout(retryTimeoutRef.current);
         retryTimeoutRef.current = null;
       }
+      if (videoUrlRef.current) {
+        URL.revokeObjectURL(videoUrlRef.current);
+        videoUrlRef.current = null;
+      }
     };
   }, []);
 
@@ -337,76 +453,6 @@ const VideoPreview = () => {
     oscillator.start();
     oscillatorRef.current = oscillator;
     gainNodeRef.current = gainNode;
-  };
-
-  // Upload e processamento inicial
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setVideoFile(file);
-    setIsLoading(true);
-    setProgressData(null);
-    setProgressMessage('');
-    setIsWaitingSession(false);
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-
-    const formData = new FormData();
-    formData.append("video", file);
-    if (selectedWords.length > 0) {
-      formData.append("forbidden_words", JSON.stringify(selectedWords));
-    }
-
-    try {
-      const response = await apiCall(`${API_BASE}/api/process_video_preview`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (data.status === "success") {
-        const newHash = data.video_hash;
-        setVideoHash(newHash);
-        
-        // Iniciar monitoramento de progresso
-        monitorProgress(newHash);
-        
-        setSubtitles(data.subtitles);
-        if (
-          Array.isArray(data.forbidden_words) &&
-          data.forbidden_words.length
-        ) {
-          setSelectedWords(data.forbidden_words);
-        }
-        // Carregar intervalos de beep se disponíveis
-        if (Array.isArray(data.beep_intervals)) {
-          setBeepIntervals(
-            data.beep_intervals.map((interval, index) => ({
-              id: index,
-              start: interval[0],
-              end: interval[1],
-              word: interval[2] || "desconhecida", // palavra relacionada, se disponível
-            }))
-          );
-        }
-
-        // Criar URL do vídeo para preview
-        const videoURL = URL.createObjectURL(file);
-        if (videoRef.current) {
-          videoRef.current.src = videoURL;
-        }
-      } else {
-        alert(`Erro: ${data.message}`);
-      }
-    } catch (error) {
-      alert(`Erro de conexão: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // Atualizar tempo atual do vídeo
@@ -606,24 +652,6 @@ const VideoPreview = () => {
       <div className={styles.container}>
         <div className={styles.header}>
           <h1 className="video-preview-titulo">Editor de Vídeo com Legendas</h1>
-          {!videoFile && (
-            <div className={styles.uploadSection}>
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleFileUpload}
-                ref={fileInputRef}
-                style={{ display: "none" }}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className={styles.uploadBtn}
-                disabled={isLoading}
-              >
-                {isLoading ? "Processando..." : "Selecionar Vídeo"}
-              </button>
-            </div>
-          )}
         </div>
 
         <div className={styles.waitContainer}>
@@ -659,24 +687,6 @@ const VideoPreview = () => {
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className="video-preview-titulo">Editor de Vídeo com Legendas</h1>
-        {!videoFile && (
-          <div className={styles.uploadSection}>
-            <input
-              type="file"
-              accept="video/*"
-              onChange={handleFileUpload}
-              ref={fileInputRef}
-              style={{ display: "none" }}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className={styles.uploadBtn}
-              disabled={isLoading}
-            >
-              {isLoading ? "Processando..." : "Selecionar Vídeo"}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Barra de Progresso SSE */}
@@ -717,19 +727,69 @@ const VideoPreview = () => {
         </div>
       )}
 
-      <div className={styles.wordsPanel}>
-        {isFetchingWords ? (
-          <p>Carregando palavras sugeridas...</p>
-        ) : (
-          <ForbiddenWordsSelector
-            availableWords={availableWords}
-            selectedWords={selectedWords}
-            onChange={setSelectedWords}
-            label="Palavras proibidas"
-          />
-        )}
-        {wordsError && <p className={styles.wordsError}>{wordsError}</p>}
-      </div>
+      {!videoHash && !isWaitingSession && (
+        <div className={styles.sessionListSection}>
+          <div className={styles.sessionListHeader}>
+            <div>
+              <h2>Escolha um vídeo para continuar</h2>
+              <p>Selecione um dos vídeos que já estão prontos para edição.</p>
+            </div>
+            <button
+              type="button"
+              className={styles.refreshSessionsBtn}
+              onClick={loadAvailableSessions}
+              disabled={sessionsLoading}
+            >
+              {sessionsLoading ? "Atualizando..." : "Atualizar lista"}
+            </button>
+          </div>
+
+          {sessionsError && (
+            <p className={styles.sessionsError}>Erro: {sessionsError}</p>
+          )}
+
+          {sessionsLoading ? (
+            <p className={styles.sessionsHint}>Carregando vídeos disponíveis...</p>
+          ) : availableSessions.length === 0 ? (
+            <div className={styles.sessionsEmpty}>
+              <p>Nenhum vídeo disponível para edição no momento.</p>
+              <p>Envie um novo vídeo ou finalize um processamento para aparecer aqui.</p>
+            </div>
+          ) : (
+            <div className={styles.sessionCards}>
+              {availableSessions.map((session) => (
+                <div className={styles.sessionCard} key={session.video_hash}>
+                  <div className={styles.sessionCardHeader}>
+                    <h3>{session.filename}</h3>
+                    <span className={styles.sessionProgress}>
+                      {Math.round(session.progress ?? 0)}%
+                    </span>
+                  </div>
+                  <p className={styles.sessionMessage}>
+                    {session.message ||
+                      "Preview disponível para continuar a edição."}
+                  </p>
+                  <div className={styles.sessionMeta}>
+                    <span>
+                      Atualizado: {formatTimestamp(session.updated_at || session.created_at)}
+                    </span>
+                    <span>Hash: {session.video_hash}</span>
+                  </div>
+                  <div className={styles.sessionActions}>
+                    <button
+                      type="button"
+                      className={styles.sessionButton}
+                      onClick={() => handleOpenSession(session.video_hash)}
+                    >
+                      Continuar edição
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {videoFile && (
         <div className={styles.mainContent}>
@@ -738,6 +798,7 @@ const VideoPreview = () => {
             <div className={styles.videoContainer}>
               <video
                 ref={videoRef}
+                src={videoSrc || undefined}
                 controls
                 onTimeUpdate={handleTimeUpdate}
                 onPause={handlePause}
@@ -1042,6 +1103,11 @@ const VideoPreview = () => {
                   setSubtitles([]);
                   setCurrentTime(0);
                   setActiveSubtitleIndex(-1);
+                  setVideoSrc("");
+                  if (videoUrlRef.current) {
+                    URL.revokeObjectURL(videoUrlRef.current);
+                    videoUrlRef.current = null;
+                  }
                 }}
                 className={styles.newVideoBtn}
               >

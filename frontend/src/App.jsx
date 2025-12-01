@@ -19,8 +19,10 @@ const App = () => {
   return (
     <AuthProvider>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Header />
-        <Routes>
+        <div className="appShell">
+          <Header />
+          <main className="appContent">
+            <Routes>
           {/* Rotas públicas */}
           <Route path="/" element={<HomePage />} />
           <Route path="/CriarConta" element={<CriarConta />} />
@@ -59,8 +61,10 @@ const App = () => {
           
           {/* 404 */}
           <Route path="*" element={<Pagina404 />} />
-        </Routes>
-        <Footer />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
       </BrowserRouter>
     </AuthProvider>
   )

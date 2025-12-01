@@ -2,6 +2,10 @@ html,
 body {
   margin: 0px;
   padding: 0px;
+  min-height: 100%;
+  background-image: linear-gradient(#000633, #043e3b);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 button {
@@ -23,6 +27,19 @@ button:hover {
 #root {
   background-image: linear-gradient(#000633, #043e3b);
   width: 100%;
+  min-height: 100vh;
+}
+
+.appShell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.appContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .background {

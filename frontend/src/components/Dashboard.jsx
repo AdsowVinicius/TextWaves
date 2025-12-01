@@ -1,12 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import UserManagement from "./UserManagement";
 import "./Dashboard.css";
 
 const Dashboard = () => {
   const { user, logout, isAdmin, apiCall } = useAuth();
-  const [activeTab, setActiveTab] = useState("overview");
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const resolveTab = useCallback((searchValue) => {
+    const params = new URLSearchParams(searchValue || "");
+    const requested = params.get("tab") || "overview";
+    const allowed = new Set(["overview", "videos", "users", "profile"]);
+    if (!allowed.has(requested)) {
+      return "overview";
+    }
+    if (requested === "users" && !isAdmin()) {
+      return "overview";
+    }
+    return requested;
+  }, [isAdmin]);
+
+  const [activeTab, setActiveTab] = useState(() => resolveTab(location.search));
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -27,7 +43,21 @@ const Dashboard = () => {
   const [videoHistory, setVideoHistory] = useState([]);
   const [videosLoading, setVideosLoading] = useState(false);
   const [videosError, setVideosError] = useState("");
-  const navigate = useNavigate();
+
+  useEffect(() => {
+    const tabFromLocation = resolveTab(location.search);
+    if (tabFromLocation !== activeTab) {
+      setActiveTab(tabFromLocation);
+    }
+  }, [location.search, activeTab, resolveTab]);
+
+  const updateTab = useCallback((tab) => {
+    const nextTab = resolveTab(`tab=${tab}`);
+    setActiveTab(nextTab);
+    const params = new URLSearchParams(location.search || "");
+    params.set("tab", nextTab);
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  }, [location.pathname, location.search, navigate, resolveTab]);
 
   const loadVideoHistory = useCallback(async (silent = false) => {
     if (!silent) {
@@ -154,6 +184,65 @@ const Dashboard = () => {
       error: { label: "Erro", className: "status-error" },
     };
     return map[status] || { label: "Em andamento", className: "status-default" };
+  };
+
+  const getStageInfo = (stage, status) => {
+    if (!stage) {
+      return null;
+    }
+
+    const map = {
+      uploading: {
+        label: "Etapa: enviando vídeo",
+        hint: "O arquivo está sendo enviado para nossos servidores.",
+      },
+      extracting_audio: {
+        label: "Etapa: extraindo áudio",
+        hint: "Separando o áudio original para análise.",
+      },
+      transcribing: {
+        label: "Etapa: transcrevendo áudio",
+        hint: "Whisper está convertendo a fala em texto.",
+      },
+      censoring: {
+        label: "Etapa: analisando palavras",
+        hint: "Gerando legendas e aplicando beeps onde necessário.",
+      },
+      loading_session: {
+        label: "Etapa: preparando sessão",
+        hint: "Recuperando dados e ajustes salvos.",
+      },
+      processing_beeps: {
+        label: "Etapa: processando beeps",
+        hint: "Aplicando efeitos sonoros configurados.",
+      },
+      rendering_video: {
+        label: "Etapa: renderizando vídeo",
+        hint: "Gerando o vídeo final com legendas e efeitos.",
+      },
+      finalizing: {
+        label: "Etapa: finalizando",
+        hint: "Organizando o arquivo para download.",
+      },
+      completed: {
+        label:
+          status === "preview_ready"
+            ? "Preview disponível"
+            : "Processo concluído",
+        hint: status === "preview_ready"
+          ? "O preview está pronto para ser revisto."
+          : "O vídeo final está pronto para download.",
+      },
+      error: {
+        label: "Etapa: erro detectado",
+        hint: "Identificamos um problema durante o processamento.",
+      },
+    };
+
+    return map[stage] || {
+      label: `Etapa atual: ${stage.replace(/_/g, " ")}`,
+      hint: "Processando...",
+    };
   };
 
   const handleOpenVideo = (video) => {
@@ -364,14 +453,14 @@ const Dashboard = () => {
         <div className="dashboard-nav-lista">
           <button
             className={`nav-btn ${activeTab === "overview" ? "active" : ""}`}
-            onClick={() => setActiveTab("overview")}
+            onClick={() => updateTab("overview")}
           >
             📊 Visão Geral
           </button>
 
           <button
             className={`nav-btn ${activeTab === "videos" ? "active" : ""}`}
-            onClick={() => setActiveTab("videos")}
+            onClick={() => updateTab("videos")}
           >
             🎬 Meus Vídeos
           </button>
@@ -379,7 +468,7 @@ const Dashboard = () => {
           {isAdmin() && (
             <button
               className={`nav-btn ${activeTab === "users" ? "active" : ""}`}
-              onClick={() => setActiveTab("users")}
+              onClick={() => updateTab("users")}
             >
               👥 Gerenciar Usuários
             </button>
@@ -387,7 +476,7 @@ const Dashboard = () => {
 
           <button
             className={`nav-btn ${activeTab === "profile" ? "active" : ""}`}
-            onClick={() => setActiveTab("profile")}
+            onClick={() => updateTab("profile")}
           >
             ⚙️ Perfil
           </button>
@@ -451,7 +540,7 @@ const Dashboard = () => {
                 </button>
                 <button
                   className="btn btn-secondary"
-                  onClick={() => setActiveTab("videos")}
+                  onClick={() => updateTab("videos")}
                 >
                   📋 Ver Histórico
                 </button>
@@ -500,6 +589,8 @@ const Dashboard = () => {
                   const status = getStatusConfig(video.status);
                   const progressValue = Math.round(video.progress ?? 0);
                   const durationLabel = formatDuration(video.duration_seconds);
+                  const stageInfo = getStageInfo(video.stage, video.status);
+                  const progressHint = video.message || stageInfo?.hint;
 
                   return (
                     <div className="video-card" key={video.video_hash}>
@@ -513,19 +604,38 @@ const Dashboard = () => {
                         <span className="video-hash">#{video.video_hash}</span>
                       </div>
 
-                      <p className="video-message">
-                        {video.message ||
-                          (video.status === "error"
-                            ? "Falha no processamento."
-                            : "Aguardando atualização de status...")}
-                      </p>
+                      {stageInfo ? (
+                        <p className="video-message">
+                          <strong>{stageInfo.label}</strong>
+                          {stageInfo.hint && <span> — {stageInfo.hint}</span>}
+                        </p>
+                      ) : (
+                        <p className="video-message">
+                          {video.message ||
+                            (video.status === "error"
+                              ? "Falha no processamento."
+                              : "Aguardando atualização de status...")}
+                        </p>
+                      )}
+
+                      {video.message && stageInfo && stageInfo.hint !== video.message && (
+                        <p
+                          className="video-message"
+                          style={{ fontSize: "0.9rem", marginTop: "-0.25rem", opacity: 0.85 }}
+                        >
+                          {video.message}
+                        </p>
+                      )}
 
                       {video.status === "error" && video.last_error && (
                         <p className="video-error-detail">{video.last_error}</p>
                       )}
 
                       <div className="progress-wrapper">
-                        <div className="progress-bar">
+                        <div
+                          className="progress-bar"
+                          title={progressHint || "Processando..."}
+                        >
                           <div
                             className="progress-bar-fill"
                             style={{

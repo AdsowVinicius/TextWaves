@@ -57,6 +57,155 @@
   color: #444;
 }
 
+.sessionListSection {
+  margin-bottom: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  padding: 20px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.sessionListHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sessionListHeader h2 {
+  margin: 0;
+  color: #1f2933;
+}
+
+.sessionListHeader p {
+  margin: 4px 0 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.refreshSessionsBtn {
+  background: linear-gradient(135deg, #47e4ca 0%, #18625b 100%);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 160px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.refreshSessionsBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(71, 228, 202, 0.4);
+}
+
+.refreshSessionsBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.sessionsError {
+  margin: 0 0 12px;
+  color: #d64545;
+  font-weight: 500;
+}
+
+.sessionsHint {
+  margin: 0;
+  color: #4b5563;
+}
+
+.sessionsEmpty {
+  padding: 20px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  text-align: center;
+  color: #4b5563;
+  background: #f8fafc;
+}
+
+.sessionCards {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.sessionCard {
+  background: #fdfdfd;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sessionCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.sessionCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sessionCardHeader h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1f2933;
+}
+
+.sessionProgress {
+  font-weight: 600;
+  color: #0f766e;
+  background: rgba(15, 118, 110, 0.12);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.sessionMessage {
+  margin: 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.sessionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.sessionActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sessionButton {
+  background: linear-gradient(135deg, #47e4ca 0%, #18625b 100%);
+  border: none;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sessionButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(71, 228, 202, 0.4);
+}
+
 .wordsError {
   margin-top: 8px;
   color: #d64545;

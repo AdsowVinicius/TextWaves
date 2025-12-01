@@ -1,19 +1,13 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import Button from "./Button";
-import Modal from "./Modal";
 import styles from "./Header.module.css";
 
 const Header = () => {
-  const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
 
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
 
   const handleLogout = async () => {
     if (confirm("Tem certeza que deseja sair?")) {
@@ -25,27 +19,68 @@ const Header = () => {
 
   const logoTarget = isAuthenticated() ? "/dashboard" : "/sobre-nos";
 
-  const buttonsPage = () => {
-    if (isAuthenticated()) {
+  const menuItems = React.useMemo(() => {
+    if (!isAuthenticated()) {
+      return [
+        { to: "/", label: "Início" },
+        { to: "/Projeto", label: "Novo Vídeo" },
+        { to: "/sobre-nos", label: "Sobre nós" },
+        { to: "/CriarConta", label: "Criar conta" },
+        { to: "/login", label: "Entrar", highlight: true },
+      ];
+    }
+
+    return [
+      {
+        to: "/dashboard",
+        label: user?.username ? `Dashboard (${user.username})` : "Dashboard",
+      },
+      { to: "/Projeto", label: "Novo Vídeo" },
+      { to: "/Editor", label: "Editor" },
+      { to: "/dashboard?tab=videos", label: "Histórico" },
+      { to: "/sobre-nos", label: "Sobre nós" },
+      { action: "logout", label: "Sair" },
+    ];
+  }, [isAuthenticated, user?.username]);
+
+  const renderMenuItem = (item, isMobile = false) => {
+    const commonProps = {
+      className: `${styles.editorMh} ${
+        item.highlight ? styles.highlightLink : ""
+      }`,
+      onClick:
+        item.action === "logout"
+          ? (e) => {
+              e.preventDefault();
+              handleLogout();
+              setMenuOpen(false);
+            }
+          : () => {
+              if (isMobile) {
+                setMenuOpen(false);
+              }
+            },
+    };
+
+    if (item.action === "logout") {
       return (
-        <div className={styles.userMenu}>
-          <Link to="/dashboard" className={styles.userLink}>
-            👤 {user?.username}
-          </Link>
-          <button onClick={handleLogout} className={styles.logoutBtn}>
-            Sair
-          </button>
-        </div>
+        <button
+          type="button"
+          {...commonProps}
+          className={`${styles.editorMh} ${styles.logoutLink} ${
+            item.highlight ? styles.highlightLink : ""
+          }`}
+        >
+          {item.label}
+        </button>
       );
     }
 
-    if (location.pathname === "/" || location.pathname === "/CriarConta") {
-      return (
-        <Link className={styles.editorMh} to="/login">
-          <Button>Entrar</Button>
-        </Link>
-      );
-    }
+    return (
+      <Link {...commonProps} to={item.to}>
+        <p>{item.label}</p>
+      </Link>
+    );
   };
 
   return (
@@ -59,17 +94,11 @@ const Header = () => {
         <div className={styles.menu}>
           <nav>
             <ul>
-              <li>
-                <Link className={styles.editorMh} to="/Projeto">
-                  <p>Novo Vídeo</p>
-                </Link>
-              </li>
-              <li>
-                <Link className={styles.editorMh} to="/sobre-nos">
-                  <p>Sobre nós</p>
-                </Link>
-              </li>
-              <li>{buttonsPage()}</li>
+              {menuItems.map((item, index) => (
+                <li key={`${item.label}-${index}`}>
+                  {renderMenuItem(item)}
+                </li>
+              ))}
             </ul>
           </nav>
         </div>
@@ -89,26 +118,13 @@ const Header = () => {
 
       {/* Menu Mobile */}
       <div className={`${styles.mobileMenu} ${menuOpen ? styles.show : ""}`}>
-        <Link
-          className={styles.editorMh}
-          to="/Projeto"
-          onClick={() => setMenuOpen(false)}
-        >
-          <p>Novo Vídeo</p>
-        </Link>
-        <Link
-          className={styles.editorMh}
-          to="/sobre-nos"
-          onClick={() => setMenuOpen(false)}
-        >
-          <p>Sobre nós</p>
-        </Link>
-        {buttonsPage()}
+        {menuItems.map((item, index) => (
+          <React.Fragment key={`${item.label}-${index}`}>
+            {renderMenuItem(item, true)}
+          </React.Fragment>
+        ))}
       </div>
 
-      {!isAuthenticated() && (
-        <Modal isOpen={isModalOpen} closeModal={closeModal} />
-      )}
     </header>
   );
 };
