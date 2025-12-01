@@ -4,8 +4,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-image: linear-gradient(#000633, #043e3b);
   padding: 20px;
+  font-family: "Roboto", sans-serif;
 }
 
 .login-card {
@@ -16,6 +17,11 @@
   width: 100%;
   max-width: 400px;
   animation: slideUp 0.5s ease-out;
+}
+
+h2 {
+  font-family: "Krona One", sans-serif;
+  font-size: 28px;
 }
 
 @keyframes slideUp {
@@ -66,7 +72,7 @@
 
 .tab.active {
   background: white;
-  color: #667eea;
+  color: #66beea;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -112,11 +118,11 @@
 
 .form-group input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #66eacd;
 }
 
 .submit-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-image: linear-gradient(#3bdaca, #24b8b0);
   color: white;
   padding: 14px;
   border: none;
@@ -142,7 +148,7 @@
   .login-card {
     padding: 30px 20px;
   }
-  
+
   .login-header h2 {
     font-size: 1.5rem;
   }

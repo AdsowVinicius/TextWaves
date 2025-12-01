@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import os
 import hashlib
+import uuid
 
 from flask import Blueprint, jsonify, request, send_file
+from flask_jwt_extended import get_jwt_identity, jwt_required
+from werkzeug.utils import secure_filename
 
 try:
     from app.config import settings
@@ -18,6 +21,8 @@ from utils.CreateVideoWinthSubtitles import (
     SubtitleRenderingOptions,
     create_video_with_subtitles,
 )
+from utils.progress_tracker import initialize_progress, update_progress, set_error
+from models.video_model import VideoTask
 
 preview_bp = Blueprint('preview', __name__)
 
@@ -42,9 +47,11 @@ def _parse_forbidden_words(raw_value: str | None) -> list[str] | None:
 
 
 @preview_bp.route('/process_video_preview', methods=['POST'])
+@jwt_required()
 def process_video_preview():
     """Processa o vídeo apenas para extrair legendas, sem renderizar"""
     try:
+        user_id = get_jwt_identity()
         if 'video' not in request.files:
             return jsonify({'status': 'error', 'message': "Nenhum arquivo de vídeo enviado!"}), 400
 
@@ -58,21 +65,67 @@ def process_video_preview():
         upload_folder = 'uploads'
         os.makedirs(upload_folder, exist_ok=True)
 
-        video_path = os.path.join(upload_folder, video_file.filename)
+        safe_name = secure_filename(video_file.filename) or f"video_{uuid.uuid4().hex}.mp4"
+        unique_name = f"upload_{uuid.uuid4().hex}_{safe_name}"
+        video_path = os.path.join(upload_folder, unique_name)
         video_file.save(video_path)
 
         # Gerar hash único
         with open(video_path, 'rb') as vf:
             video_hash = hashlib.sha256(vf.read()).hexdigest()[:10]
 
+        session_file = os.path.join(upload_folder, f"session_{video_hash}.json")
+        VideoTask.create_or_reset(
+            video_hash=video_hash,
+            user_id=str(user_id),
+            filename=video_file.filename,
+            session_path=session_file,
+        )
+
+        # Inicializar rastreamento de progresso
+        initialize_progress(video_hash)
+        VideoTask.record_progress(
+            video_hash,
+            stage='uploading',
+            progress=5,
+            message='Arquivo recebido',
+            status='processing',
+        )
+        update_progress(video_hash, 'extracting_audio', 10, 'Extraindo áudio do vídeo...')
+        VideoTask.record_progress(
+            video_hash,
+            stage='extracting_audio',
+            progress=10,
+            message='Extraindo áudio do vídeo...',
+            status='processing',
+        )
+
         # Extrair áudio
         audio_path = os.path.join(upload_folder, f"temp_audio_{video_hash}.wav")
         extract_audio_from_video(video_path, audio_path)
 
         # Transcrever áudio
+        update_progress(video_hash, 'transcribing', 40, 'Transcrevendo áudio com Whisper...')
+        VideoTask.record_progress(
+            video_hash,
+            stage='transcribing',
+            progress=40,
+            message='Transcrevendo áudio com Whisper...',
+        )
         transcribed_result = transcribe_audio(audio_path)
         segments = transcribed_result['segments']
+        VideoTask.update_metadata(
+            video_hash,
+            duration_seconds=transcribed_result.get('duration'),
+        )
 
+        update_progress(video_hash, 'censoring', 70, 'Detectando palavras e gerando beeps...')
+        VideoTask.record_progress(
+            video_hash,
+            stage='censoring',
+            progress=70,
+            message='Detectando palavras e gerando beeps...',
+        )
         sanitized_subtitles, beep_intervals = censor_segments(
             segments,
             forbidden_words=forbidden_words,
@@ -112,6 +165,15 @@ def process_video_preview():
         if os.path.exists(audio_path):
             os.remove(audio_path)
 
+        update_progress(video_hash, 'completed', 100, 'Preview pronto!')
+        VideoTask.record_progress(
+            video_hash,
+            stage='completed',
+            progress=100,
+            message='Preview pronto!',
+            status='preview_ready',
+        )
+
         return jsonify({
             'status': 'success',
             'video_hash': video_hash,
@@ -123,13 +185,18 @@ def process_video_preview():
 
     except Exception as e:
         print(f"Erro no processo de preview: {str(e)}")
+        if 'video_hash' in locals():
+            set_error(video_hash, str(e))
+            VideoTask.mark_error(video_hash, str(e))
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @preview_bp.route('/update_subtitles', methods=['POST'])
+@jwt_required()
 def update_subtitles():
     """Atualiza as legendas editadas pelo usuário"""
     try:
+        user_id = get_jwt_identity()
         data = request.get_json()
         video_hash = data.get('video_hash')
         updated_subtitles = data.get('subtitles')
@@ -138,6 +205,10 @@ def update_subtitles():
 
         if not video_hash or not updated_subtitles:
             return jsonify({'status': 'error', 'message': 'Dados incompletos'}), 400
+
+        task = VideoTask.get_for_user(video_hash, str(user_id))
+        if task is None:
+            return jsonify({'status': 'error', 'message': 'Sessão não encontrada para este usuário'}), 404
 
         # Carregar sessão existente
         session_file = os.path.join('uploads', f"session_{video_hash}.json")
@@ -174,9 +245,11 @@ def update_subtitles():
 
 
 @preview_bp.route('/render_final_video', methods=['POST'])
+@jwt_required()
 def render_final_video():
     """Renderiza o vídeo final com as legendas editadas"""
     try:
+        user_id = get_jwt_identity()
         data = request.get_json()
         video_hash = data.get('video_hash')
         subtitle_config = data.get('subtitle_config', {})
@@ -185,6 +258,22 @@ def render_final_video():
 
         if not video_hash:
             return jsonify({'status': 'error', 'message': 'Hash do vídeo é obrigatório'}), 400
+
+        # Inicializar rastreamento de progresso
+        initialize_progress(video_hash)
+        update_progress(video_hash, 'loading_session', 5, 'Carregando sessão...')
+
+        task = VideoTask.get_for_user(video_hash, str(user_id))
+        if task is None:
+            return jsonify({'status': 'error', 'message': 'Sessão não encontrada para este usuário'}), 404
+
+        VideoTask.record_progress(
+            video_hash,
+            stage='loading_session',
+            progress=5,
+            message='Carregando sessão...',
+            status='rendering',
+        )
 
         # Carregar sessão
         session_file = os.path.join('uploads', f"session_{video_hash}.json")
@@ -206,6 +295,13 @@ def render_final_video():
             forbidden_words = session_words
 
         # Usar beeps editados se fornecidos, senão recalcular
+        update_progress(video_hash, 'processing_beeps', 20, 'Processando beeps...')
+        VideoTask.record_progress(
+            video_hash,
+            stage='processing_beeps',
+            progress=20,
+            message='Processando beeps...',
+        )
         if custom_beep_intervals is not None and isinstance(custom_beep_intervals, list):
             # Usar beeps editados pelo usuário
             beep_intervals = [
@@ -237,6 +333,13 @@ def render_final_video():
         output_video_path = os.path.join('uploads', output_video_name)
 
         # Renderizar vídeo
+        update_progress(video_hash, 'rendering_video', 40, 'Renderizando vídeo com efeitos...')
+        VideoTask.record_progress(
+            video_hash,
+            stage='rendering_video',
+            progress=40,
+            message='Renderizando vídeo com efeitos...',
+        )
         subtitle_options = SubtitleRenderingOptions(font_path=str(settings.font_path))
         create_video_with_subtitles(
             video_path,
@@ -248,21 +351,45 @@ def render_final_video():
             beep_volume=settings.beep_volume,
         )
 
+        update_progress(video_hash, 'finalizing', 90, 'Finalizando arquivo...')
+        VideoTask.record_progress(
+            video_hash,
+            stage='finalizing',
+            progress=90,
+            message='Finalizando arquivo...',
+        )
+
         # Limpar sessão e arquivos temporários após renderização
         # (mantém apenas o vídeo final por 24h para download)
         clean_session_by_hash(video_hash, keep_final_video=True)
+        VideoTask.clear_session_reference(video_hash)
+
+        update_progress(video_hash, 'completed', 100, 'Vídeo pronto para download!')
+        VideoTask.mark_completed(
+            video_hash,
+            output_video_path,
+            message='Vídeo pronto para download!',
+        )
 
         return send_file(output_video_path, as_attachment=False, mimetype='video/mp4')
 
     except Exception as e:
         print(f"Erro na renderização: {str(e)}")
+        if 'video_hash' in locals():
+            set_error(video_hash, str(e))
+            VideoTask.mark_error(video_hash, str(e))
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @preview_bp.route('/get_session/<video_hash>', methods=['GET'])
+@jwt_required()
 def get_session(video_hash):
     """Recupera dados da sessão"""
     try:
+        user_id = get_jwt_identity()
+        task = VideoTask.get_for_user(video_hash, str(user_id))
+        if task is None:
+            return jsonify({'status': 'error', 'message': 'Sessão não encontrada para este usuário'}), 404
         session_file = os.path.join('uploads', f"session_{video_hash}.json")
         if not os.path.exists(session_file):
             return jsonify({'status': 'error', 'message': 'Sessão não encontrada'}), 404
@@ -280,9 +407,14 @@ def get_session(video_hash):
 
 
 @preview_bp.route('/get_video/<video_hash>', methods=['GET'])
+@jwt_required()
 def get_video(video_hash):
     """Serve o vídeo original para preview"""
     try:
+        user_id = get_jwt_identity()
+        task = VideoTask.get_for_user(video_hash, str(user_id))
+        if task is None:
+            return jsonify({'status': 'error', 'message': 'Sessão não encontrada para este usuário'}), 404
         session_file = os.path.join('uploads', f"session_{video_hash}.json")
         if not os.path.exists(session_file):
             return jsonify({'status': 'error', 'message': 'Sessão não encontrada'}), 404

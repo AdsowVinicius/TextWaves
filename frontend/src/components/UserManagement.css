@@ -279,28 +279,28 @@
   .users-filters {
     flex-direction: column;
   }
-  
+
   .filter-group {
     min-width: auto;
   }
-  
+
   .users-table-container {
     overflow-x: auto;
   }
-  
+
   .users-table {
     min-width: 700px;
   }
-  
+
   .pagination {
     flex-direction: column;
     gap: 12px;
   }
-  
+
   .user-actions {
     flex-direction: column;
   }
-  
+
   .modal {
     margin: 0;
     max-height: 100vh;

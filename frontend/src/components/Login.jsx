@@ -1,21 +1,21 @@
-import { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import './Login.css';
+import { useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
+import "./Login.css";
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    login: '',
-    password: ''
+    login: "",
+    password: "",
   });
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [registerData, setRegisterData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
 
   const { login } = useContext(AuthContext);
@@ -23,14 +23,14 @@ const Login = () => {
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
       });
@@ -39,13 +39,13 @@ const Login = () => {
 
       if (response.ok) {
         login(data.user, data.access_token, data.refresh_token);
-        navigate('/dashboard');
+        navigate("/dashboard");
       } else {
-        setError(data.error || 'Erro no login');
+        setError(data.error || "Erro no login");
       }
     } catch (error) {
-      setError('Erro de conexão com o servidor');
-      console.error('Login error:', error);
+      setError("Erro de conexão com o servidor");
+      console.error("Login error:", error);
     } finally {
       setLoading(false);
     }
@@ -53,20 +53,20 @@ const Login = () => {
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (registerData.password !== registerData.confirmPassword) {
-      setError('Senhas não coincidem');
+      setError("Senhas não coincidem");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username: registerData.username,
@@ -78,15 +78,23 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        alert(data.message + (data.is_first_user ? ' (Você é o primeiro usuário - Admin)' : ''));
+        alert(
+          data.message +
+            (data.is_first_user ? " (Você é o primeiro usuário - Admin)" : "")
+        );
         setIsLogin(true);
-        setRegisterData({ username: '', email: '', password: '', confirmPassword: '' });
+        setRegisterData({
+          username: "",
+          email: "",
+          password: "",
+          confirmPassword: "",
+        });
       } else {
-        setError(data.error || 'Erro no registro');
+        setError(data.error || "Erro no registro");
       }
     } catch (error) {
-      setError('Erro de conexão com o servidor');
-      console.error('Register error:', error);
+      setError("Erro de conexão com o servidor");
+      console.error("Register error:", error);
     } finally {
       setLoading(false);
     }
@@ -95,9 +103,9 @@ const Login = () => {
   const handleInputChange = (e, isRegister = false) => {
     const { name, value } = e.target;
     if (isRegister) {
-      setRegisterData(prev => ({ ...prev, [name]: value }));
+      setRegisterData((prev) => ({ ...prev, [name]: value }));
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -105,19 +113,19 @@ const Login = () => {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h2>🎥 TextWaves</h2>
+          <h2>TextWaves</h2>
           <p>Sistema de Legendagem de Vídeos</p>
         </div>
 
         <div className="login-tabs">
-          <button 
-            className={`tab ${isLogin ? 'active' : ''}`}
+          <button
+            className={`tab ${isLogin ? "active" : ""}`}
             onClick={() => setIsLogin(true)}
           >
             Entrar
           </button>
-          <button 
-            className={`tab ${!isLogin ? 'active' : ''}`}
+          <button
+            className={`tab ${!isLogin ? "active" : ""}`}
             onClick={() => setIsLogin(false)}
           >
             Registrar
@@ -155,7 +163,7 @@ const Login = () => {
             </div>
 
             <button type="submit" className="submit-btn" disabled={loading}>
-              {loading ? 'Entrando...' : 'Entrar'}
+              {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
         ) : (
@@ -213,7 +221,7 @@ const Login = () => {
             </div>
 
             <button type="submit" className="submit-btn" disabled={loading}>
-              {loading ? 'Registrando...' : 'Registrar'}
+              {loading ? "Registrando..." : "Registrar"}
             </button>
           </form>
         )}

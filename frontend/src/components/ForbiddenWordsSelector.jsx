@@ -1,18 +1,18 @@
-import { useState, useMemo } from 'react';
-import styles from './ForbiddenWordsSelector.module.css';
+import { useState, useMemo } from "react";
+import styles from "./ForbiddenWordsSelector.module.css";
 
-const normalize = (word) => word.normalize('NFC').toLowerCase();
+const normalize = (word) => word.normalize("NFC").toLowerCase();
 
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const ForbiddenWordsSelector = ({
   availableWords = [],
   selectedWords = [],
   onChange,
-  label = 'Palavras proibidas',
+  label = "Palavras proibidas",
   allowCustom = true,
 }) => {
-  const [customWord, setCustomWord] = useState('');
+  const [customWord, setCustomWord] = useState("");
 
   const normalizedSelected = useMemo(() => {
     const map = new Map();
@@ -43,11 +43,11 @@ const ForbiddenWordsSelector = ({
     if (!normalizedSelected.has(key)) {
       onChange?.([...selectedWords, value]);
     }
-    setCustomWord('');
+    setCustomWord("");
   };
 
   const handleInputKeyDown = (event) => {
-    if (event.key === 'Enter') {
+    if (event.key === "Enter") {
       event.preventDefault();
       handleSubmit(event);
     }
@@ -58,14 +58,18 @@ const ForbiddenWordsSelector = ({
     availableWords.forEach((word) => {
       known.set(normalize(word), word);
     });
-    return Array.from(known.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return Array.from(known.values()).sort((a, b) =>
+      a.localeCompare(b, "pt-BR")
+    );
   }, [availableWords]);
 
   return (
     <div className={styles.wrapper}>
       <div className={styles.headerRow}>
         <h3 className={styles.title}>{label}</h3>
-        <span className={styles.counter}>{selectedWords.length} selecionada(s)</span>
+        <span className={styles.counter}>
+          {selectedWords.length} selecionada(s)
+        </span>
       </div>
 
       {sortedWords.length > 0 ? (
@@ -100,14 +104,16 @@ const ForbiddenWordsSelector = ({
             onKeyDown={handleInputKeyDown}
             placeholder="Adicionar palavra personalizada"
           />
-          <button type="submit">Adicionar</button>
+          <button className="btn-adicionar" type="submit">
+            Adicionar
+          </button>
         </form>
       )}
 
       {selectedWords.length > 0 && (
         <div className={styles.selectedChips}>
           {selectedWords.map((word) => {
-            const key = normalize(word) + '-chip';
+            const key = normalize(word) + "-chip";
             return (
               <button
                 key={key}
@@ -129,9 +135,11 @@ const ForbiddenWordsSelector = ({
 
 export const buildMaskRegExp = (words) => {
   if (!words?.length) return null;
-  const escaped = words.map((word) => escapeRegExp(word.trim())).filter(Boolean);
+  const escaped = words
+    .map((word) => escapeRegExp(word.trim()))
+    .filter(Boolean);
   if (!escaped.length) return null;
-  return new RegExp(`\\b(${escaped.join('|')})\\b`, 'gi');
+  return new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
 };
 
 export default ForbiddenWordsSelector;

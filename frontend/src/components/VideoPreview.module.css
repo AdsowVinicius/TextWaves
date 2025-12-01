@@ -3,7 +3,8 @@
   max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
+  padding-top: 65px;
 }
 
 .header {
@@ -21,7 +22,7 @@
 }
 
 .uploadBtn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #47e4ca 0%, #18625b 100%);
   color: white;
   border: none;
   padding: 12px 24px;
@@ -70,7 +71,7 @@
 
 /* Seção do Vídeo */
 .videoSection {
-  background: #f8f9fa;
+  background: transparent;
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -84,6 +85,7 @@
 }
 
 .videoPlayer {
+  min-height: 400px;
   width: 100%;
   height: auto;
   display: block;
@@ -169,7 +171,7 @@
 }
 
 .activeSubtitle {
-  color: #667eea;
+  color: #66beea;
   font-weight: bold;
 }
 
@@ -198,7 +200,7 @@
 
 .subtitleItem.active {
   background-color: #e8f0fe;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid #66beea;
 }
 
 .subtitleItem:last-child {
@@ -218,7 +220,7 @@
 }
 
 .seekBtn {
-  background: #667eea;
+  background: #66beea;
   color: white;
   border: none;
   padding: 4px 8px;
@@ -228,7 +230,7 @@
 }
 
 .seekBtn:hover {
-  background: #5a67d8;
+  background: #5abed8;
 }
 
 .timingInputs {
@@ -266,7 +268,7 @@
 
 .textEditor:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #66beea;
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
@@ -278,7 +280,9 @@
   flex-wrap: wrap;
 }
 
-.saveBtn, .renderBtn, .newVideoBtn {
+.saveBtn,
+.renderBtn,
+.newVideoBtn {
   padding: 12px 24px;
   border: none;
   border-radius: 6px;
@@ -315,7 +319,8 @@
   background: #5a6268;
 }
 
-.saveBtn:disabled, .renderBtn:disabled {
+.saveBtn:disabled,
+.renderBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -392,6 +397,95 @@
   margin: 5px 0;
   color: #004085;
   font-size: 14px;
+}
+
+.waitContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 55vh;
+}
+
+.waitCard {
+  background: linear-gradient(135deg, #ffffff 0%, #f3f8ff 100%);
+  border-radius: 16px;
+  padding: 40px 36px;
+  box-shadow: 0 24px 45px rgba(13, 70, 160, 0.18);
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.waitCard h2 {
+  margin: 16px 0 8px 0;
+  color: #0f172a;
+  font-size: 1.6rem;
+}
+
+.waitMessage {
+  color: #475569;
+  margin-bottom: 24px;
+  font-size: 1rem;
+}
+
+.waitProgressWrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.waitProgressBar {
+  flex: 1;
+  height: 10px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.waitProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #47e4ca 0%, #18625b 100%);
+  transition: width 0.4s ease;
+}
+
+.waitProgressValue {
+  font-weight: 600;
+  color: #0f766e;
+  min-width: 48px;
+  text-align: right;
+}
+
+.waitHint {
+  color: #64748b;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.waitError {
+  color: #dc2626;
+  font-weight: 600;
+  margin: 0;
+}
+
+.waitSpinner {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 6px solid rgba(71, 228, 202, 0.25);
+  border-top-color: #47e4ca;
+  animation: wait-spin 1s linear infinite;
+}
+
+@keyframes wait-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .addBeepBtn {
@@ -501,6 +595,15 @@
 
 .removeBtn:hover {
   background: #c82333;
+}
+
+.video-preview-titulo,
+h1 {
+  color: #f7f7f7 !important;
+}
+
+.video-preview-titulo {
+  padding-top: 65px;
 }
 
 .beepPreview {

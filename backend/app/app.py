@@ -23,7 +23,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+
+
+def _parse_allowed_origins(raw_value: str | None) -> list[str]:
+    if not raw_value:
+        return ["http://localhost:5173", "http://127.0.0.1:5173"]
+    return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+
+
+allowed_origins = _parse_allowed_origins(os.getenv("TEXTWAVES_CORS_ORIGINS"))
+CORS(
+    app,
+    resources={r"/api/*": {"origins": allowed_origins}},
+    supports_credentials=True,
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    expose_headers=["Content-Disposition"],
+)
+
+# Aumentar timeout para vídeos longos (até 15 minutos)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['PROPAGATE_EXCEPTIONS'] = True
 
 # Configurações JWT
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'textwaves-secret-key-change-in-production')
@@ -40,16 +59,21 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Inicializar banco de dados
 from database.db_config import init_database
+from models.video_model import VideoTask  # noqa: F401 - garante registro do modelo
 init_database(app)
 
 # Registrar blueprints
 from routes.auth_routes import auth_bp
 from routes.user_management_routes import users_bp
 from routes.preview_routes import preview_bp
+from routes.data_routes import data_bp
+from routes.video_routes import videos_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(users_bp, url_prefix='/api')
 app.register_blueprint(preview_bp, url_prefix='/api')
+app.register_blueprint(data_bp, url_prefix='/api')
+app.register_blueprint(videos_bp, url_prefix='/api')
 
 # Executar limpeza de sessões antigas na inicialização (> 24 horas)
 startup_cleanup(max_age_hours=24)

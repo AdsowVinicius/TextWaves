@@ -41,3 +41,15 @@
   font-size: 18px;
   margin-top: 24px;
 }
+
+@media (max-width: 900px) {
+  .InfoCards {
+    grid-template-columns: 1fr;
+    padding-top: 117px;
+    gap: 0px;
+  }
+
+  .InfoCards .imageIcon {
+    display: none;
+  }
+}

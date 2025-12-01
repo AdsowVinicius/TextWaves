@@ -10,6 +10,7 @@ import Projeto from './components/Projeto';
 import VideoPreview from './components/VideoPreview';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import SobreNos from './components/SobreNos';
 import ProtectedRoute from './components/ProtectedRoute';
 import './global.css'
 
@@ -23,7 +24,15 @@ const App = () => {
           {/* Rotas públicas */}
           <Route path="/" element={<HomePage />} />
           <Route path="/CriarConta" element={<CriarConta />} />
-          <Route path="/Projeto" element={<Projeto />} />
+          <Route 
+            path="/Projeto" 
+            element={
+              <ProtectedRoute>
+                <Projeto />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="/sobre-nos" element={<SobreNos />} />
           <Route path="/login" element={<Login />} />
           
           {/* Rotas protegidas */}

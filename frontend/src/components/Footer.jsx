@@ -9,12 +9,6 @@ const Footer = () => {
         <nav>
           <ul>
             <li>
-              <a href="/">Planos</a>
-            </li>
-            <li>
-              <a href="/">Privacidade</a>
-            </li>
-            <li>
               <a href="">textwaves@gmail.com</a>
             </li>
             <li>
@@ -22,9 +16,6 @@ const Footer = () => {
             </li>
             <li>
               <a href="/">Termos</a>
-            </li>
-            <li>
-              <a href="/">Voltar ao topo</a>
             </li>
           </ul>
         </nav>

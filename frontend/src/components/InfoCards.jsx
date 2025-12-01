@@ -11,13 +11,13 @@ const InfoCards = ({
   caption,
 }) => {
   return (
-    <section div className={styles.InfoCards}>
+    <section className={styles.InfoCards}>
       <img src={image} alt={caption} className={styles.image} />
       <div className={styles.texto}>
-        <img src={imageIcon} className={styles.imageIcon} width="30" />
-        <h3 className="card.title">{title}</h3>
-        <h5 className="card.subtitle">{subtitle}</h5>
-        <p className="card.description">{description}</p>
+        <img src={imageIcon} className={styles.imageIcon} width="30" alt="icon" />
+        <h3 className={styles.title}>{title}</h3>
+        <h5 className={styles.subtitle}>{subtitle}</h5>
+        <p className={styles.description}>{description}</p>
       </div>
     </section>
   );

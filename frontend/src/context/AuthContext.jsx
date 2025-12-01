@@ -130,13 +130,19 @@ export const AuthProvider = ({ children }) => {
       throw new Error('Token não disponível');
     }
 
+    const isFormData = options.body instanceof FormData;
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+    };
+
+    if (options.body !== undefined && !isFormData && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const response = await fetch(url, {
       ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     // Se token expirou, tentar renovar
